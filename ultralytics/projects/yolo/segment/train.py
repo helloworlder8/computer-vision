@@ -3,7 +3,7 @@
 from copy import copy
 
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks import SegmentationModel,creat_model_dict_add
+from ultralytics.nn.tasks_model import SegmentationModel,creat_model_dict_add
 from ultralytics.utils import DEFAULT_PARAM, RANK
 from ultralytics.utils.plotting import plot_images, plot_results
 

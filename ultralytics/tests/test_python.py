@@ -67,7 +67,7 @@ def test_model_methods():
 
 def test_model_profile():
     """Test profiling of the YOLO model with 'profile=True' argument."""
-    from ultralytics.nn.tasks import DetectionModel
+    from ultralytics.nn.tasks_model import DetectionModel
 
     model = DetectionModel()  # build model
     im = torch.randn(1, 3, 64, 64)  # requires min imgsz=64

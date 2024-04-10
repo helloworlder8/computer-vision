@@ -22,7 +22,7 @@ from torch import nn, optim
 
 from ultralytics.cfg_yaml import creat_args, creat_save_dir
 from ultralytics.data.verify import check_cls_dataset, check_detect_dataset
-from ultralytics.nn.tasks import load_pytorch_model, attempt_load_weights
+from ultralytics.nn.tasks_model import load_pytorch_model, attempt_load_weights
 from ultralytics.utils import (
     DEFAULT_PARAM,
     LOGGER,

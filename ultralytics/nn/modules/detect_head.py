@@ -13,7 +13,7 @@ from .base_conv import Conv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder","WorldDetect"
+__all__ = "Detect","WorldDetect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder"
 
 
 class Detect(nn.Module):

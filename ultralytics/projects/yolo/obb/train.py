@@ -3,7 +3,7 @@
 from copy import copy
 
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks import OBBModel,creat_model_dict_add
+from ultralytics.nn.tasks_model import OBBModel,creat_model_dict_add
 from ultralytics.utils import DEFAULT_PARAM, RANK
 
 

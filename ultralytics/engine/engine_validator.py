@@ -155,7 +155,7 @@ class Engine_Validator: #分类和检测验证
             # Loss
             with dt[2]:
                 if self.training:
-                    self.loss += model.computer_loss(batch, preds)[1]
+                    self.loss += model.computer_loss(batch, preds)[1]  #验证损失
 
             # Postprocess
             with dt[3]:

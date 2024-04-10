@@ -1,6 +1,6 @@
 # Ultralytics YOLO 🚀, AGPL-3.0 license
 
-from .tasks import (
+from .tasks_model import (
     Base_Model,
     ClassificationModel,
     Detection_Model,

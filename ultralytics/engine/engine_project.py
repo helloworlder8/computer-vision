@@ -10,7 +10,7 @@ import torch
 
 from ultralytics.cfg_yaml import TASK_TO_DATA_CFG, creat_args, creat_save_dir
 from ultralytics.hub.utils import HUB_WEB_ROOT
-from ultralytics.nn.tasks import load_pytorch_model, creat_model_task_name, nn, creat_model_dict_add
+from ultralytics.nn.tasks_model import load_pytorch_model, creat_model_task_name, nn, creat_model_dict_add
 from ultralytics.utils import ASSETS, DEFAULT_PARAM_DICT, LOGGER, RANK, SETTINGS, callbacks, checks, emojis, yaml_load
 
 
@@ -643,3 +643,12 @@ class Project_Engine(nn.Module):
         raise NotImplementedError("Please provide task_name map for your model!")
 
 
+    def profile(self, imgsz):
+        if type(imgsz) is int:
+            inputs = torch.randn((2, 3, imgsz, imgsz))
+        else:
+            inputs = torch.randn((2, 3, imgsz[0], imgsz[1]))
+        if next(self.model.parameters()).device.type == 'cuda':
+            return self.model.predict(inputs.to(torch.device('cuda')), profile=True)
+        else:
+            self.model.predict(inputs, profile=True)

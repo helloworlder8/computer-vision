@@ -3,7 +3,7 @@
 from copy import copy
 
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks import PoseModel,creat_model_dict_add
+from ultralytics.nn.tasks_model import PoseModel,creat_model_dict_add
 from ultralytics.utils import DEFAULT_PARAM, LOGGER
 from ultralytics.utils.plotting import plot_images, plot_results
 

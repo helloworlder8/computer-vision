@@ -5,7 +5,7 @@ from copy import copy
 import torch
 
 from ultralytics.projects.yolo.detect import Detection_Trainer
-from ultralytics.nn.tasks import RTDETRDetectionModel,creat_model_dict_add
+from ultralytics.nn.tasks_model import RTDETRDetectionModel,creat_model_dict_add
 from ultralytics.utils import RANK, colorstr
 from .val import RTDETRDataset, RTDETRValidator
 

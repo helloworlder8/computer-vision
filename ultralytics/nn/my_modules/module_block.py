@@ -16,6 +16,7 @@ __all__ = (
     "ShuffleNetV2",
     "space_to_depth",
     "ShuffleNetV3",
+    "CoordAtt",
 )
 
 ######################   slim-neck-by-gsconv ####     start ###############################

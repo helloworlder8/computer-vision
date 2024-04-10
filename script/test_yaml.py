@@ -3,10 +3,10 @@ from ultralytics import YOLO
 
 if __name__ == '__main__':
     error_result = []
-    for yaml_path in tqdm.tqdm(os.listdir('ultralytics/cfg_yaml/model_yaml/v8')):
+    for yaml_path in tqdm.tqdm(os.listdir('ultralytics/cfg_yaml/test_model_yaml')):
         if 'rtdetr' not in yaml_path and 'cls' not in yaml_path:
             try:
-                model = YOLO(f'ultralytics/cfg_yaml/model_yaml/v8/{yaml_path}')
+                model = YOLO(f'{yaml_path}',task_name='detect')
                 model.info(detailed=True)
                 model.profile([640, 640])
                 model.fuse()

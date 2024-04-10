@@ -143,9 +143,9 @@ def bbox_iou(box1, box2, xywh=True, GIoU=False, DIoU=False, CIoU=False, EIoU=Fal
         convex_hei = b1_y2.maximum(b2_y2) - b1_y1.minimum(b2_y1)  # convex height
         if CIoU or DIoU or EIoU or SIoU or WIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1
             convex_area_squared = (convex_wid ** 2 + convex_hei ** 2) ** pow + eps  # convex diagonal squared外接面积平方
-            center_dist_wid = (b2_x1 + b2_x2 - b1_x1 - b1_x2) * 0.5 + eps #宽中心点距离之差
-            center_dist_hei = (b2_y1 + b2_y2 - b1_y1 - b1_y2) * 0.5 + eps #高中心点距离之差
-            center_dist_squared = torch.pow(center_dist_wid ** 2 + center_dist_hei ** 2, pow)  # 中心距离平方
+            center_wid = (b2_x1 + b2_x2 - b1_x1 - b1_x2) * 0.5 + eps #宽中心点距离之差
+            center_hei = (b2_y1 + b2_y2 - b1_y1 - b1_y2) * 0.5 + eps #高中心点距离之差
+            center_dist_squared = torch.pow(center_wid ** 2 + center_hei ** 2, pow)  # 中心距离平方
             if CIoU:  # https://github.com/Zzh-tju/DIoU-SSD-pytorconvex_hei/blob/master/utils/box/box_utils.py#L47
                 v = (4 / math.pi ** 2) * (torch.atan(w2 / h2) - torch.atan(w1 / h1)).pow(2)
                 with torch.no_grad():
@@ -168,23 +168,38 @@ def bbox_iou(box1, box2, xywh=True, GIoU=False, DIoU=False, CIoU=False, EIoU=Fal
                     return iou - (center_dist_squared / convex_area_squared + rho_w2 / convex_wid2 + rho_h2 / convex_hei2) # EIou
             elif SIoU:
                 # SIoU Loss https://arxiv.org/pdf/2205.12740.pdf
-                center_dist = torch.pow(center_dist_wid ** 2 + center_dist_hei ** 2, 0.5)
-                sin_pow_1 = torch.abs(center_dist_wid) / center_dist
-                sin_pow_2 = torch.abs(center_dist_hei) / center_dist
-                threshold = 2 ** 0.5 / 2
-                sin_pow = torch.where(sin_pow_1 > threshold, sin_pow_2, sin_pow_1)
-                angle_cost = torch.cos(torch.arcsin(sin_pow) * 2 - math.pi / 2)
-                rho_x = (center_dist_wid / convex_wid) ** 2
-                rho_y = (center_dist_hei / convex_hei) ** 2
+                center_dist = torch.pow(center_wid ** 2 + center_hei ** 2, 0.5) #中心点距离
+
+
+                """ #角度成本 """
+                sin_x = torch.abs(center_wid) / center_dist #中心点距离宽比中心点距离
+                sin_y = torch.abs(center_hei) / center_dist #中心点距离高比中心点距离
+                threshold = 2 ** 0.5 / 2    #阈值
+                sin_best = torch.where(sin_x > threshold, sin_y, sin_x) #根据角度选合适的
+                angle_cost = torch.cos(torch.arcsin(sin_best) * 2 - math.pi / 2)        #角度成本
+
+
+                """ 距离成本 """
+                min_w =  w2.minimum(w1)
+                min_h =  h2.minimum(h1)
+                # rho_x = (center_wid / min_w) ** 2 #中心宽比上最小宽
+                # rho_y = (center_hei / min_h) ** 2
+                rho_x = (center_wid / convex_wid) ** 2
+                rho_y = (center_hei / convex_hei) ** 2
                 gamma = angle_cost - 2
-                distance_cost = 2 - torch.exp(gamma * rho_x) - torch.exp(gamma * rho_y)
-                omiga_w = torch.abs(w1 - w2) / torch.max(w1, w2)
+                distance_cost = 2 - torch.exp(gamma * rho_x) - torch.exp(gamma * rho_y) #角度也想插一手    
+
+                """ 形状成本 """
+                omiga_w = torch.abs(w1 - w2) / torch.max(w1, w2) #两者宽差比宽最大的
                 omiga_h = torch.abs(h1 - h2) / torch.max(h1, h2)
                 shape_cost = torch.pow(1 - torch.exp(-1 * omiga_w), 4) + torch.pow(1 - torch.exp(-1 * omiga_h), 4)
                 if Focal:
                     return iou - torch.pow(0.5 * (distance_cost + shape_cost) + eps, pow), torch.pow(inter/(union + eps), gamma) # Focal_SIou
                 else:
                     return iou - torch.pow(0.5 * (distance_cost + shape_cost) + eps, pow) # SIou
+            
+            
+            
             elif WIoU:
                 if Focal:
                     raise RuntimeError("WIoU do not support Focal.")

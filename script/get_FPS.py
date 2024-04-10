@@ -24,7 +24,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm
 
 from ultralytics.utils.torch_utils import select_device
-from ultralytics.nn.tasks import attempt_load_weights
+from ultralytics.nn.tasks_model import attempt_load_weights
 
 def get_weight_size(path):
     stats = os.stat(path)

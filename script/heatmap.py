@@ -7,7 +7,7 @@ np.random.seed(0)
 import matplotlib.pyplot as plt
 from tqdm import trange
 from PIL import Image
-from ultralytics.nn.tasks import DetectionModel as Model
+from ultralytics.nn.tasks_model import DetectionModel as Model
 from ultralytics.utils.torch_utils import intersect_dicts
 from ultralytics.utils.ops import xywh2xyxy
 from pytorch_grad_cam import GradCAMPlusPlus, GradCAM, XGradCAM

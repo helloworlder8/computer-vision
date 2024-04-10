@@ -6,7 +6,7 @@ import torchvision
 from ultralytics.data import ClassificationDataset, creat_dataloader
 from ultralytics.engine.engine_trainer import Engine_Trainer
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks import ClassificationModel, load_pytorch_model,creat_model_dict_add
+from ultralytics.nn.tasks_model import ClassificationModel, load_pytorch_model,creat_model_dict_add
 from ultralytics.utils import DEFAULT_PARAM, LOGGER, RANK, colorstr
 from ultralytics.utils.plotting import plot_images, plot_results
 from ultralytics.utils.torch_utils import is_parallel, strip_optimizer, torch_distributed_zero_first

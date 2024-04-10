@@ -10,7 +10,7 @@ import torch.nn as nn
 from ultralytics.data import creat_dataloader, create_dataset
 from ultralytics.engine.engine_trainer import Engine_Trainer
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks import Detection_Model,creat_model_dict_add
+from ultralytics.nn.tasks_model import Detection_Model,creat_model_dict_add
 from ultralytics.utils import LOGGER, RANK
 from ultralytics.utils.plotting import plot_images, plot_labels, plot_results
 from ultralytics.utils.torch_utils import de_parallel, torch_distributed_zero_first

@@ -11,22 +11,52 @@ def send_notice(content):
 
 
 if __name__ == '__main__':
-    model = YOLO('ultralytics/cfg_yaml/test_model_yaml/ShuffleNet_24_04_04.0_light.yaml',task_name='detect')
-    model.train(data_str="../datasets/BIRDSAI-FORE-BACKUP/BIRDSAI-FORE.yaml",
+    model = YOLO('ultralytics/cfg_yaml/models_yaml/v8/yolov8.yaml',task_name='detect')
+    metrics = model.train(data_str="../../datasets/BIRDSAI-FORE-BACKUP/BIRDSAI-FORE.yaml",
                 cache=False,
                 imgsz=640,
                 # close_mosaic=10,
                 # workers=4,
                 # optimizer='SGD', # using SGD
                 val_interval=1,
-                # resume='', # last.pt path
+                # resume='true', # last.pt path
                 # amp=False # close amp
                 # fraction=0.2,
                 task_name='detect',
                 project='',
-                device='0',
-                epochs=20,
-                batch=30,
-                name='',
+                device='2,3',
+                epochs=100,
+                batch=250,
+                name='V8-',
                 )
-    send_notice(f"训练正确率:55%\n测试正确率:96.5%")
+    send_notice(f"Precision(B): {metrics['metrics/precision(B)']}, "
+      f"Recall(B): {metrics['metrics/recall(B)']}, "
+      f"mAP50(B): {metrics['metrics/mAP50(B)']}, "
+      f"mAP50-95(B): {metrics['metrics/mAP50-95(B)']}, "
+      f"Fitness: {metrics['fitness']}")
+    
+
+    # model = YOLO('ultralytics/cfg_yaml/model_yaml/v5/yolov5.yaml',task_name='detect')
+    # metrics = model.train(data_str="../datasets/BIRDSAI-FORE-BACKUP/BIRDSAI-FORE.yaml",
+    #             cache=False,
+    #             imgsz=640,
+    #             # close_mosaic=10,
+    #             # workers=4,
+    #             # optimizer='SGD', # using SGD
+    #             val_interval=1,
+    #             # resume='', # last.pt path
+    #             # amp=False # close amp
+    #             # fraction=0.2,
+    #             task_name='detect',
+    #             project='',
+    #             device='2',
+    #             epochs=200,
+    #             batch=150,
+    #             name='V5',
+    #             )
+
+    # send_notice(f"Precision(B): {metrics['/precision(B)']}, "
+    #   f"Recall(B): {metrics['/recall(B)']}, "
+    #   f"mAP50(B): {metrics['/mAP50(B)']}, "
+    #   f"mAP50-95(B): {metrics['/mAP50-95(B)']}, "
+    #   f"Fitness: {metrics['fitness']}")

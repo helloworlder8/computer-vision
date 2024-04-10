@@ -163,13 +163,13 @@ class GhostConv(nn.Module):
         """
         super().__init__()
         c_ = c2 // 2  # hidden channels
-        self.cv1 = Conv(c1, c_, k, s, None, g, act=act)
-        self.cv2 = Conv(c_, c_, 5, 1, None, c_, act=act)
+        self.cv1 = Conv(c1, c_, k, s, None, g, act=act) #1x1卷积
+        self.cv2 = Conv(c_, c_, 5, 1, None, c_, act=act) #5x5卷积通道可分离
 
     def forward(self, x):
-        """Forward propagation through a Ghost Bottleneck layer with skip connection."""
+        """Forward propagation through a Ghost Bottleneck layer with skip connection.""" 
         y = self.cv1(x)
-        return torch.cat((y, self.cv2(y)), 1)
+        return torch.cat((y, self.cv2(y)), 1) #两条支路拼接
 
 
 class RepConv(nn.Module):

@@ -3,260 +3,212 @@
 import torch
 import torch.nn as nn
 
-from .checks import check_version
-from .metrics import bbox_iou, probiou
-from .ops import xywhr2xyxyxyxy
+from  ultralytics.utils.checks import check_version
+from  ultralytics.utils.metrics import bbox_iou, probiou
+from  ultralytics.utils.ops import xywhr2xyxyxyxy
+
+# from .checks import check_version
+# from .metrics import bbox_iou, probiou
+# from .ops import xywhr2xyxyxyxy
 
 TORCH_1_10 = check_version(torch.__version__, "1.10.0")
 
 
 class TaskAlignedAssigner(nn.Module):
-    """
-    A task_name-aligned assigner for object detection.
 
-    This class assigns ground-truth (gt) objects to anchors based on the task_name-aligned metric, which combines both
-    classification and localization information.
-
-    Attributes:
-        topk (int): The number of top candidates to consider.
-        num_classes (int): The number of object classes.
-        alpha (float): The alpha parameter for the classification component of the task_name-aligned metric.
-        beta (float): The beta parameter for the localization component of the task_name-aligned metric.
-        eps (float): A small value to prevent division by zero.
-    """
-
-    def __init__(self, topk=13, num_classes=80, alpha=1.0, beta=6.0, eps=1e-9):
+    def __init__(self, topk=13, nc=80, alpha=1.0, beta=6.0, eps=1e-9):
         """Initialize a TaskAlignedAssigner object with customizable hyperparameters."""
         super().__init__()
-        self.topk = topk
-        self.num_classes = num_classes
-        self.bg_idx = num_classes
-        self.alpha = alpha
-        self.beta = beta
-        self.eps = eps
+        self.topk = topk ## 每个gt box最多选择topk个候选框作为正样本 10
+        self.nc = nc #80
+        self.bg_idx = nc #80
+        self.alpha = alpha #0.5
+        self.beta = beta #6
+        self.eps = eps #极小
 
-    @torch.no_grad()
-    def forward(self, pd_scores, pd_bboxes, anc_points, gt_labels, gt_bboxes, mask_gt):
-        """                           torch.Size([8400, 2])
-        Compute the task_name-aligned assignment. Reference code is available at
-        https://github.com/Nioolek/PPYOLOE_pytorch/blob/master/ppyoloe/assigner/tal_assigner.py.
 
-        Args:
-            pd_scores (Tensor): shape(bs, num_total_anchors, num_classes)
-            pd_bboxes (Tensor): shape(bs, num_total_anchors, 4)
-            anc_points (Tensor): shape(num_total_anchors, 2)
-            gt_labels (Tensor): shape(bs, n_max_boxes, 1)
-            gt_bboxes (Tensor): shape(bs, n_max_boxes, 4)
-            mask_gt (Tensor): shape(bs, n_max_boxes, 1)
+        # _, target_bboxes_BA4matrix, mask_target_class_BACmatrix, mask_poss_sum_bool, _ = self.assigner.forward(
+        #     anchor_points * stride_points, #      8400 2
 
-        Returns:
-            target_labels_dict (Tensor): shape(bs, num_total_anchors)
-            target_bboxes (Tensor): shape(bs, num_total_anchors, 4)
-            target_scores (Tensor): shape(bs, num_total_anchors, num_classes)
-            fg_mask (Tensor): shape(bs, num_total_anchors)
-            target_gt_idx (Tensor): shape(bs, num_total_anchors)
-        """
-        self.bs = pd_scores.shape[0] #torch.Size([2, 8400, 80]) ->2
-        self.n_max_boxes = gt_bboxes.shape[1] #torch.Size([2, 8, 4])-》8
+        #     pd_class.detach().sigmoid(), #torch.Size([2, 8400, 80])   sigmoid
+        #     (pd_bboxes.detach() * stride_points).type(gt_bboxes.dtype), #torch.Size([2, 8400, 4])
 
-        if self.n_max_boxes == 0:
+        #     gt_class, #torch.Size([2, 8, 1])
+        #     gt_bboxes, #torch.Size([2, 8, 4])
+        #     mask_gt_BT1,   #torch.Size([2, 8, 1])
+        # )
+    @torch.no_grad() 
+    def forward(self, anchor_points, pd_class, pd_bboxes,  gt_class, gt_bboxes, mask_gt_BT1):
+        # tensors = {
+        #     'anchor_points': anchor_points,
+        
+        #     'pd_class': pd_class,
+        #     'pd_bboxes': pd_bboxes,
+
+        #     'gt_class': gt_class,
+        #     'gt_bboxes': gt_bboxes,
+        #     'mask_gt_BT1': mask_gt_BT1,
+        # }
+        # torch.save(tensors, 'runs/debug_param/TaskAlignedAssigne.pt')
+
+        # 标签分配
+        self.batch_size = gt_bboxes.shape[0] #2
+        self.num_max_boxes = gt_bboxes.shape[1] #8
+
+        # 如果不存在真实框，直接返回结果
+        if self.num_max_boxes == 0:
             device = gt_bboxes.device
             return (
-                torch.full_like(pd_scores[..., 0], self.bg_idx).to(device),
+                torch.full_like(pd_class[..., 0], self.bg_idx).to(device),
                 torch.zeros_like(pd_bboxes).to(device),
-                torch.zeros_like(pd_scores).to(device),
-                torch.zeros_like(pd_scores[..., 0]).to(device),
-                torch.zeros_like(pd_scores[..., 0]).to(device),
+                torch.zeros_like(pd_class).to(device),
+                torch.zeros_like(pd_class[..., 0]).to(device),
+                torch.zeros_like(pd_class[..., 0]).to(device),
             )
 
-        mask_pos, align_metric, overlaps = self.get_pos_mask(
-            pd_scores, pd_bboxes, gt_labels, gt_bboxes, anc_points, mask_gt
+        mask_pos_BTAmetrics, fuse_BTAmaxtric, gt_bboxes_score_BTAmaxtric = self.computer_maskpos_fusemetric_bboxesscores(
+            anchor_points, pd_class, pd_bboxes, gt_class, gt_bboxes, mask_gt_BT1
         )
-
-        target_gt_idx, fg_mask, mask_pos = self.select_highest_overlaps(mask_pos, overlaps, self.n_max_boxes)
+        # 压缩给索引     压缩填1
+        mask_poss_idx_BAmetrics, mask_poss_sum_BAmetrics, mask_pos_BTAmetrics = self.mask_pos_postprocessing(mask_pos_BTAmetrics, gt_bboxes_score_BTAmaxtric, self.num_max_boxes)
 
         # Assigned target
-        target_labels_dict, target_bboxes, target_scores = self.get_targets(gt_labels, gt_bboxes, target_gt_idx, fg_mask)
+        target_class_BAmatrix, target_bboxes_BA4matrix, mask_target_class_BACmatrix = self.get_targets(gt_class, gt_bboxes, mask_poss_idx_BAmetrics, mask_poss_sum_BAmetrics)
 
         # Normalize
-        align_metric *= mask_pos
-        pos_align_metrics = align_metric.amax(dim=-1, keepdim=True)  # b, max_num_obj
-        pos_overlaps = (overlaps * mask_pos).amax(dim=-1, keepdim=True)  # b, max_num_obj
-        norm_align_metric = (align_metric * pos_overlaps / (pos_align_metrics + self.eps)).amax(-2).unsqueeze(-1)
-        target_scores = target_scores * norm_align_metric
+        fuse_BTAmaxtric *= mask_pos_BTAmetrics #torch.Size([2, 8, 8400])
+        pos_align_metrics = fuse_BTAmaxtric.amax(dim=-1, keepdim=True)  # b, max_num_obj
+        pos_bboxes_scores = (gt_bboxes_score_BTAmaxtric * mask_pos_BTAmetrics).amax(dim=-1, keepdim=True)  # b, max_num_obj
+        norm_align_metric = (fuse_BTAmaxtric * pos_bboxes_scores / (pos_align_metrics + self.eps)).amax(-2).unsqueeze(-1)
+        mask_target_class_BACmatrix = mask_target_class_BACmatrix * norm_align_metric
 
-        return target_labels_dict, target_bboxes, target_scores, fg_mask.bool(), target_gt_idx
+        return target_class_BAmatrix, target_bboxes_BA4matrix, mask_target_class_BACmatrix, mask_poss_sum_BAmetrics.bool(), mask_poss_idx_BAmetrics
 
-    def get_pos_mask(self, pd_scores, pd_bboxes, gt_labels, gt_bboxes, anc_points, mask_gt):
-        """Get in_gts mask, (b, max_num_obj, h*w)."""
-        mask_in_gts = self.select_candidates_in_gts(anc_points, gt_bboxes)
-        # Get anchor_align metric, (b, max_num_obj, h*w)
-        align_metric, overlaps = self.get_box_metrics(pd_scores, pd_bboxes, gt_labels, gt_bboxes, mask_in_gts * mask_gt) #2 8 8400
-        # Get topk_metric mask, (b, max_num_obj, h*w)
-        mask_topk = self.select_topk_candidates(align_metric, topk_mask=mask_gt.expand(-1, -1, self.topk).bool())
-        # Merge all mask to a final mask, (b, max_num_obj, h*w)
-        mask_pos = mask_topk * mask_in_gts * mask_gt
 
-        return mask_pos, align_metric, overlaps
-    # #torch.Size([2, 8400, 80]) torch.Size([2, 8400, 4]) torch.Size([2, 8, 1]) torch.Size([2, 8, 4]) torch.Size([2, 8, 1])
-    def get_box_metrics(self, pd_scores, pd_bboxes, gt_labels, gt_bboxes, mask_gt):
+
+
+                 #                                 ([8400, 2])([2, 8400, 80])([2, 8400, 4])([2, 8, 1])([2, 8, 4])([2, 8, 1])
+    def computer_maskpos_fusemetric_bboxesscores(self,anchor_points, pd_class, pd_bboxes, gt_class, gt_bboxes, mask_gt_BT1):
+        """Get in_gts mask, (b, max_num_obj, h*w).""" 
+
+        """ 边界条件过滤 """
+        mask_gt_BTA = self.boundary_condition_filtering(anchor_points, gt_bboxes) #边界过滤 2 8400 4
+        """ 计算融合得分矩阵和边界得分矩阵"""                                                   
+        fuse_BTAmaxtric, gt_bboxes_score_BTAmaxtric = self.computer_fuse_BTAmaxtric(pd_class, pd_bboxes, gt_class, gt_bboxes, mask_gt_BTA * mask_gt_BT1) #
+        """一个target 最多10个点 """
+        mask_tk_fuse_BTAmetrics = self.get_best_topk_form_fuse_BTAmetrics_mask(fuse_BTAmaxtric, topk_mask=mask_gt_BT1.expand(-1, -1, self.topk).bool()) #torch.Size([2, 8, 8400])  0 1
+        """ 综合条件 有目标 边界满足 值在前10 """
+        mask_pos_BTAmetrics = mask_gt_BT1 * mask_gt_BTA * mask_tk_fuse_BTAmetrics  #前10综合得分前10  anchir_point在内并且靠中心  最基本要求  递进关系
+        # torch.equal(mask_tk_fuse_BTAmetrics, mask_pos_BTAmetrics)
+
+        return mask_pos_BTAmetrics, fuse_BTAmaxtric, gt_bboxes_score_BTAmaxtric #torch.Size([2, 8, 8400]) torch.Size([2, 8, 8400]) torch.Size([2, 8, 8400])
+
+
+
+    #                                             80        4          8 1      8  4           2 8 8400
+    def computer_fuse_BTAmaxtric(self, pd_class, pd_bboxes, gt_class, gt_bboxes, mask_gt_BTA): #torch.Size([2, 8, 8400])
         """Compute alignment metric given predicted and ground truth bounding boxes."""
-        na = pd_bboxes.shape[-2]
-        mask_gt = mask_gt.bool()  # b, max_num_obj, h*w
-        overlaps = torch.zeros([self.bs, self.n_max_boxes, na], dtype=pd_bboxes.dtype, device=pd_bboxes.device) #2 8 8400
-        bbox_scores = torch.zeros([self.bs, self.n_max_boxes, na], dtype=pd_scores.dtype, device=pd_scores.device)#2 8 8400
+        na = pd_bboxes.shape[-2] #8400 
+        mask_gt_BTA = mask_gt_BTA.bool()  # 2 8 8400
+        gt_class_BTAmaxtric = torch.zeros([self.batch_size, self.num_max_boxes, na], dtype=pd_class.dtype, device=pd_class.device)#2 8 8400
+        gt_bboxes_score_BTAmaxtric = torch.zeros([self.batch_size, self.num_max_boxes, na], dtype=pd_bboxes.dtype, device=pd_bboxes.device) #2 8 8400
 
-        ind = torch.zeros([2, self.bs, self.n_max_boxes], dtype=torch.long)  # 2, b, max_num_obj 228
-        ind[0] = torch.arange(end=self.bs).view(-1, 1).expand(-1, self.n_max_boxes)  # b, max_num_obj
-        ind[1] = gt_labels.squeeze(-1)  # b, max_num_obj
-        # Get the scores of each grid for each gt cls
-        bbox_scores[mask_gt] = pd_scores[ind[0], :, ind[1]][mask_gt]  # b, max_num_obj, h*w
+        # 获得预测类信息
+        ind = torch.zeros([2, self.batch_size, self.num_max_boxes], dtype=torch.long)  # 2, 2 8
+        ind[0] = torch.arange(end=self.batch_size).view(-1, 1).expand(-1, self.num_max_boxes)  # 2 8 第几幅画
+        ind[1] = gt_class.squeeze(-1)                                                          # 2 8 第几类
+        gt_class_BTAmaxtric[mask_gt_BTA] = pd_class[ind[0], :, ind[1]][mask_gt_BTA]  # b, max_num_obj, h*w torch.Size([2, 8, 8400]) 没有赋值
+        
+        
+        # 预测和真实的iou
+        pd_boxes = pd_bboxes.unsqueeze(1).expand(-1, self.num_max_boxes, -1, -1)[mask_gt_BTA] #([2, 1, 8400, 4])->([3392, 4])
+        gt_boxes = gt_bboxes.unsqueeze(2).expand(-1, -1, na, -1)[mask_gt_BTA] #->torch.Size([2, 8, 8400, 4])->([3392, 4])
+        gt_bboxes_score_BTAmaxtric[mask_gt_BTA] = self.iou_calculation(gt_boxes, pd_boxes)
 
-        # (b, max_num_obj, 1, 4), (b, 1, h*w, 4)
-        pd_boxes = pd_bboxes.unsqueeze(1).expand(-1, self.n_max_boxes, -1, -1)[mask_gt] #torch.Size([2, 8400, 4])-> torch.Size([2, 1, 8400, 4])->torch.Size([3392, 4])
-        gt_boxes = gt_bboxes.unsqueeze(2).expand(-1, -1, na, -1)[mask_gt] #->torch.Size([2, 8, 8400, 4])
-        overlaps[mask_gt] = self.iou_calculation(gt_boxes, pd_boxes)
 
-        align_metric = bbox_scores.pow(self.alpha) * overlaps.pow(self.beta)
-        return align_metric, overlaps
+        # 相当于在回归问题上用的了预测类的信息
+        fuse_BTAmaxtric = gt_class_BTAmaxtric.pow(self.alpha) * gt_bboxes_score_BTAmaxtric.pow(self.beta)
+        return fuse_BTAmaxtric, gt_bboxes_score_BTAmaxtric
 
     def iou_calculation(self, gt_bboxes, pd_bboxes): #主逻辑改动
         """IoU calculation for horizontal bounding boxes."""
+        # return bbox_iou(gt_bboxes, pd_bboxes, xywh=False, SIoU=True).squeeze(-1).clamp_(0)
         return bbox_iou(gt_bboxes, pd_bboxes, xywh=False, SIoU=True).squeeze(-1).clamp_(0)
-        # return bbox_iou(gt_bboxes, pd_bboxes, xywh=False, CIoU=True).squeeze(-1).clamp_(0)
 
-    def select_topk_candidates(self, metrics, largest=True, topk_mask=None):
-        """
-        Select the top-k candidates based on the given metrics.
+    def get_best_topk_form_fuse_BTAmetrics_mask(self, fuse_BTAmetrics, largest=True, topk_mask=None): #2 8 10
 
-        Args:
-            metrics (Tensor): A tensor of shape (b, max_num_obj, h*w), where b is the batch size,
-                              max_num_obj is the maximum number of objects, and h*w represents the
-                              total number of anchor points.
-            largest (bool): If True, select the largest values; otherwise, select the smallest values.
-            topk_mask (Tensor): An optional boolean tensor of shape (b, max_num_obj, topk), where
-                                topk is the number of top candidates to consider. If not provided,
-                                the top-k values are automatically computed based on the given metrics.
-
-        Returns:
-            (Tensor): A tensor of shape (b, max_num_obj, h*w) containing the selected top-k candidates.
-        """
-
-        # (b, max_num_obj, topk)
-        topk_metrics, topk_idxs = torch.topk(metrics, self.topk, dim=-1, largest=largest)
+        # (b, max_num_obj, topk 看看哪个点预测得比较好
+        topk_metrics, topk_idxs = torch.topk(fuse_BTAmetrics, self.topk, dim=-1, largest=largest) #([2, 8, 8400])->([2, 8, 10])
         if topk_mask is None:
             topk_mask = (topk_metrics.max(-1, keepdim=True)[0] > self.eps).expand_as(topk_idxs)
-        # (b, max_num_obj, topk)
-        topk_idxs.masked_fill_(~topk_mask, 0)
+
+        topk_idxs.masked_fill_(~topk_mask, 0) #torch.Size([2, 8, 10])
 
         # (b, max_num_obj, topk, h*w) -> (b, max_num_obj, h*w)
-        count_tensor = torch.zeros(metrics.shape, dtype=torch.int8, device=topk_idxs.device)
-        ones = torch.ones_like(topk_idxs[:, :, :1], dtype=torch.int8, device=topk_idxs.device)
+        mask_tk_fuse_BTAmetrics = torch.zeros(fuse_BTAmetrics.shape, dtype=torch.int8, device=topk_idxs.device) #torch.Size([2, 8, 8400])
+        ones_like = torch.ones_like(topk_idxs[:, :, :1], dtype=torch.int8, device=topk_idxs.device) #torch.Size([2, 8, 1])
         for k in range(self.topk):
-            # Expand topk_idxs for each value of k and add 1 at the specified positions
-            count_tensor.scatter_add_(-1, topk_idxs[:, :, k : k + 1], ones)
-        # count_tensor.scatter_add_(-1, topk_idxs, torch.ones_like(topk_idxs, dtype=torch.int8, device=topk_idxs.device))
-        # Filter invalid bboxes
-        count_tensor.masked_fill_(count_tensor > 1, 0)
+            # 在哪个点上打1
+            mask_tk_fuse_BTAmetrics.scatter_add_(-1, topk_idxs[:, :, k : k + 1], ones_like)
+        # 有2标记为0
+        mask_tk_fuse_BTAmetrics.masked_fill_(mask_tk_fuse_BTAmetrics > 1, 0) #过滤重复的索引
 
-        return count_tensor.to(metrics.dtype)
+        return mask_tk_fuse_BTAmetrics.to(fuse_BTAmetrics.dtype)
 
-    def get_targets(self, gt_labels, gt_bboxes, target_gt_idx, fg_mask):
-        """
-        Compute target labels, target bounding boxes, and target scores for the positive anchor points.
+    def get_targets(self, gt_class, gt_bboxes, mask_poss_idx_BAmetrics, mask_poss_sum_BAmetrics):
 
-        Args:
-            gt_labels (Tensor): Ground truth labels of shape (b, max_num_obj, 1), where b is the
-                                batch size and max_num_obj is the maximum number of objects.
-            gt_bboxes (Tensor): Ground truth bounding boxes of shape (b, max_num_obj, 4).
-            target_gt_idx (Tensor): Indices of the assigned ground truth objects for positive
-                                    anchor points, with shape (b, h*w), where h*w is the total
-                                    number of anchor points.
-            fg_mask (Tensor): A boolean tensor of shape (b, h*w) indicating the positive
-                              (foreground) anchor points.
 
-        Returns:
-            (Tuple[Tensor, Tensor, Tensor]): A tuple containing the following tensors:
-                - target_labels_dict (Tensor): Shape (b, h*w), containing the target labels for
-                                          positive anchor points.
-                - target_bboxes (Tensor): Shape (b, h*w, 4), containing the target bounding boxes
-                                          for positive anchor points.
-                - target_scores (Tensor): Shape (b, h*w, num_classes), containing the target scores
-                                          for positive anchor points, where num_classes is the number
-                                          of object classes.
-        """
 
-        # Assigned target labels, (b, 1)
-        batch_ind = torch.arange(end=self.bs, dtype=torch.int64, device=gt_labels.device)[..., None]
-        target_gt_idx = target_gt_idx + batch_ind * self.n_max_boxes  # (b, h*w)
-        target_labels_dict = gt_labels.long().flatten()[target_gt_idx]  # (b, h*w)
-
-        # Assigned target boxes, (b, max_num_obj, 4) -> (b, h*w, 4)
-        target_bboxes = gt_bboxes.view(-1, gt_bboxes.shape[-1])[target_gt_idx]
-
+        batch_ind = torch.arange(end=self.batch_size, dtype=torch.int64, device=gt_class.device)[..., None]
+        mask_poss_target_idx_BAmetrics = mask_poss_idx_BAmetrics + batch_ind * self.num_max_boxes  # ([2, 8400]) ([2, 1]) 8
+        target_class_BAmatrix = gt_class.long().flatten()[mask_poss_target_idx_BAmetrics]  #16 ([2, 8400])->([2, 8400])
+        # torch.Size([2, 8400])  16
+        # 合并选择
+        target_bboxes_BA4matrix = gt_bboxes.view(-1, gt_bboxes.shape[-1])[mask_poss_target_idx_BAmetrics] #集合bbox操作 ([2, 8400, 4])
+        # torch.Size([2, 8400, 4])  16 4
         # Assigned target scores
-        target_labels_dict.clamp_(0)
+        target_class_BAmatrix.clamp_(0)
 
         # 10x faster than F.one_hot()
-        target_scores = torch.zeros(
-            (target_labels_dict.shape[0], target_labels_dict.shape[1], self.num_classes),
+        mask_target_class_BACmatrix = torch.zeros(
+            (target_class_BAmatrix.shape[0], target_class_BAmatrix.shape[1], self.nc),
             dtype=torch.int64,
-            device=target_labels_dict.device,
+            device=target_class_BAmatrix.device,
         )  # (b, h*w, 80)
-        target_scores.scatter_(2, target_labels_dict.unsqueeze(-1), 1)
+        mask_target_class_BACmatrix.scatter_(2, target_class_BAmatrix.unsqueeze(-1), 1) # torch.Size([2, 8400]) torch.Size([2, 8400, 80])
 
-        fg_scores_mask = fg_mask[:, :, None].repeat(1, 1, self.num_classes)  # (b, h*w, 80)
-        target_scores = torch.where(fg_scores_mask > 0, target_scores, 0)
+        mask_class = mask_poss_sum_BAmetrics[:, :, None].repeat(1, 1, self.nc)  # (b, h*w, 80)
+        mask_target_class_BACmatrix = torch.where(mask_class > 0, mask_target_class_BACmatrix, 0)
 
-        return target_labels_dict, target_bboxes, target_scores
-
-    @staticmethod
-    def select_candidates_in_gts(anc_points, gt_bboxes, eps=1e-9): #torch.Size([8400, 2])
-        """
-        Select the positive anchor center in gt.
-
-        Args:
-            anc_points (Tensor): shape(h*w, 2)
-            gt_bboxes (Tensor): shape(b, n_boxes, 4)
-
-        Returns:
-            (Tensor): shape(b, n_boxes, h*w)
-        """
-        n_anchors = anc_points.shape[0] #8400
-        bs, n_boxes, _ = gt_bboxes.shape #2 8 4
-        lt, rb = gt_bboxes.view(-1, 1, 4).chunk(2, 2)  # left-top, right-bottom ([16, 1, 2])  ([16, 1, 2])
-        bbox_deltas = torch.cat((anc_points[None] - lt, rb - anc_points[None]), dim=2).view(bs, n_boxes, n_anchors, -1)#torch.Size([16, 8400, 4])每一个target对应各各anchor中心点
-        # return (bbox_deltas.min(3)[0] > eps).to(gt_bboxes.dtype)-》torch.Size([2, 8, 8400, 4])
-        return bbox_deltas.amin(3).gt_(eps) #torch.Size([2, 8, 8400])
+        return target_class_BAmatrix, target_bboxes_BA4matrix, mask_target_class_BACmatrix # 2 8400   2 8400 4   2 8400 80
 
     @staticmethod
-    def select_highest_overlaps(mask_pos, overlaps, n_max_boxes):
-        """
-        If an anchor box is assigned to multiple gts, the one with the highest IoU will be selected.
+    def boundary_condition_filtering(anchor_points, gt_bboxes, eps=1e-9): #([8400, 2]) shape(2, 8, 4)
 
-        Args:
-            mask_pos (Tensor): shape(b, n_max_boxes, h*w)
-            overlaps (Tensor): shape(b, n_max_boxes, h*w)
+        num_anchors = anchor_points.shape[0] #8400
+        batch_size, num_bboxes, _ = gt_bboxes.shape #2 8 4
+        lt, rb = gt_bboxes.view(-1, 1, 4).chunk(2, 2)  # ([16, 1, 2])     0 8400 2
+        mask_gt_BA4bboxes = torch.cat((anchor_points[None] - lt, rb - anchor_points[None]), dim=2)
+        mask_gt_BA4bboxes = mask_gt_BA4bboxes.view(batch_size, num_bboxes, num_anchors, -1) #2 8 8400 4
+        # torch.Size([2, 8, 8400, 4])
+        return mask_gt_BA4bboxes.amin(3).gt_(eps) #torch.Size([2, 8, 8400]) 图目标点
 
-        Returns:
-            target_gt_idx (Tensor): shape(b, h*w)
-            fg_mask (Tensor): shape(b, h*w)
-            mask_pos (Tensor): shape(b, n_max_boxes, h*w)
-        """
-        # (b, n_max_boxes, h*w) -> (b, h*w)
-        fg_mask = mask_pos.sum(-2)
-        if fg_mask.max() > 1:  # one anchor is assigned to multiple gt_bboxes
-            mask_multi_gts = (fg_mask.unsqueeze(1) > 1).expand(-1, n_max_boxes, -1)  # (b, n_max_boxes, h*w)
-            max_overlaps_idx = overlaps.argmax(1)  # (b, h*w)
+    @staticmethod
+    def mask_pos_postprocessing(mask_pos_BTAmetrics, gt_bboxes_score_BTAmaxtric, num_max_boxes):
+        # (b, num_max_boxes, h*w) -> (b, h*w)
+        mask_poss_sum_BAmetrics = mask_pos_BTAmetrics.sum(-2) #torch.Size([2, 8400])  不管哪个目标只要有点就行
+        if mask_poss_sum_BAmetrics.max() > 1:  # 一点多框
+            mask_multi_gts = (mask_poss_sum_BAmetrics.unsqueeze(1) > 1).expand(-1, num_max_boxes, -1)  # (b, num_max_boxes, h*w)
+            max_bboxes_scores_idx = gt_bboxes_score_BTAmaxtric.argmax(1)  # (b, h*w)
 
-            is_max_overlaps = torch.zeros(mask_pos.shape, dtype=mask_pos.dtype, device=mask_pos.device)
-            is_max_overlaps.scatter_(1, max_overlaps_idx.unsqueeze(1), 1)
+            is_max_bboxes_scores = torch.zeros(mask_pos_BTAmetrics.shape, dtype=mask_pos_BTAmetrics.dtype, device=mask_pos_BTAmetrics.device)
+            is_max_bboxes_scores.scatter_(1, max_bboxes_scores_idx.unsqueeze(1), 1)
 
-            mask_pos = torch.where(mask_multi_gts, is_max_overlaps, mask_pos).float()  # (b, n_max_boxes, h*w)
-            fg_mask = mask_pos.sum(-2)
+            mask_pos_BTAmetrics = torch.where(mask_multi_gts, is_max_bboxes_scores, mask_pos_BTAmetrics).float()  # (b, num_max_boxes, h*w)
+            mask_poss_sum_BAmetrics = mask_pos_BTAmetrics.sum(-2)
         # Find each grid serve which gt(index)
-        target_gt_idx = mask_pos.argmax(-2)  # (b, h*w)
-        return target_gt_idx, fg_mask, mask_pos
+        mask_poss_idx_BAmetrics = mask_pos_BTAmetrics.argmax(-2)  # (b, h*w)  mask_pos预测和真实的综合结果
+        return mask_poss_idx_BAmetrics, mask_poss_sum_BAmetrics, mask_pos_BTAmetrics
 
 
 class RotatedTaskAlignedAssigner(TaskAlignedAssigner):
@@ -265,26 +217,26 @@ class RotatedTaskAlignedAssigner(TaskAlignedAssigner):
         return probiou(gt_bboxes, pd_bboxes).squeeze(-1).clamp_(0)
 
     @staticmethod
-    def select_candidates_in_gts(anc_points, gt_bboxes):
+    def boundary_condition_filtering(anchor_points, gt_bboxes):
         """
         Select the positive anchor center in gt for rotated bounding boxes.
 
         Args:
-            anc_points (Tensor): shape(h*w, 2)
-            gt_bboxes (Tensor): shape(b, n_boxes, 5)
+            anchor_points (Tensor): shape(h*w, 2)
+            gt_bboxes (Tensor): shape(b, num_bboxes, 5)
 
         Returns:
-            (Tensor): shape(b, n_boxes, h*w)
+            (Tensor): shape(b, num_bboxes, h*w)
         """
-        # (b, n_boxes, 5) --> (b, n_boxes, 4, 2)
+        # (b, num_bboxes, 5) --> (b, num_bboxes, 4, 2)
         corners = xywhr2xyxyxyxy(gt_bboxes)
-        # (b, n_boxes, 1, 2)
+        # (b, num_bboxes, 1, 2)
         a, b, _, d = corners.split(1, dim=-2)
         ab = b - a
         ad = d - a
 
-        # (b, n_boxes, h*w, 2)
-        ap = anc_points - a
+        # (b, num_bboxes, h*w, 2)
+        ap = anchor_points - a
         norm_ab = (ab * ab).sum(dim=-1)
         norm_ad = (ad * ad).sum(dim=-1)
         ap_dot_ab = (ap * ab).sum(dim=-1)
@@ -292,19 +244,19 @@ class RotatedTaskAlignedAssigner(TaskAlignedAssigner):
         return (ap_dot_ab >= 0) & (ap_dot_ab <= norm_ab) & (ap_dot_ad >= 0) & (ap_dot_ad <= norm_ad)  # is_in_box
 
 
-def make_anchors(preds, strides, grid_cell_offset=0.5):
+def make_anchors(preds, strides_list, offset=0.5):
     """Generate anchors from features."""
-    anchor_points, stride_tensor = [], []
+    anchor_points, stride_points = [], []
     assert preds is not None
-    dtype, device = preds[0].dtype, preds[0].device
-    for i, stride in enumerate(strides):
-        _, _, h, w = preds[i].shape
-        sx = torch.arange(end=w, device=device, dtype=dtype) + grid_cell_offset  # shift x
-        sy = torch.arange(end=h, device=device, dtype=dtype) + grid_cell_offset  # shift y
-        sy, sx = torch.meshgrid(sy, sx, indexing="ij") if TORCH_1_10 else torch.meshgrid(sy, sx)
-        anchor_points.append(torch.stack((sx, sy), -1).view(-1, 2)) #torch.Size([80, 80, 2])竖y横x torch.Size([6400, 2])
-        stride_tensor.append(torch.full((h * w, 1), stride, dtype=dtype, device=device))
-    return torch.cat(anchor_points), torch.cat(stride_tensor) #torch.Size([8400, 2])  torch.Size([8400, 1])
+    dtype, device = preds[0].dtype, preds[0].device #想要同等数据类型和设备
+    for i, stride in enumerate(strides_list):
+        _, _, h, w = preds[i].shape #宽高
+        gridi = torch.arange(end=h, device=device, dtype=dtype) + offset  
+        gridj = torch.arange(end=w, device=device, dtype=dtype) + offset  
+        gridi, gridj = torch.meshgrid(gridi, gridj, indexing="ij") if TORCH_1_10 else torch.meshgrid(gridi, gridj)
+        anchor_points.append(torch.stack((gridj, gridi), -1).view(-1, 2)) #torch.Size([80, 80, 2])竖y横x torch.Size([6400, 2])
+        stride_points.append(torch.full((h * w, 1), stride, dtype=dtype, device=device))
+    return torch.cat(anchor_points), torch.cat(stride_points) #torch.Size([8400, 2])  torch.Size([8400, 1])和特征1图尺寸强相关
 
 
 def dist2bbox(distance, anchor_points, xywh=True, dim=-1):#torch.Size([2, 8400, 4]) torch.Size([8400, 2])
@@ -330,16 +282,32 @@ def dist2rbox(pred_dist, pred_angle, anchor_points, dim=-1):
     Decode predicted object bounding box coordinates from anchor points and distribution.
 
     Args:
-        pred_dist (torch.Tensor): Predicted rotated distance, (bs, h*w, 4).
-        pred_angle (torch.Tensor): Predicted angle, (bs, h*w, 1).
+        pred_dist (torch.Tensor): Predicted rotated distance, (batch_size, h*w, 4).
+        pred_angle (torch.Tensor): Predicted angle, (batch_size, h*w, 1).
         anchor_points (torch.Tensor): Anchor points, (h*w, 2).
     Returns:
-        (torch.Tensor): Predicted rotated bounding boxes, (bs, h*w, 4).
+        (torch.Tensor): Predicted rotated bounding boxes, (batch_size, h*w, 4).
     """
     lt, rb = pred_dist.split(2, dim=dim)
     cos, sin = torch.cos(pred_angle), torch.sin(pred_angle)
-    # (bs, h*w, 1)
+    # (batch_size, h*w, 1)
     xf, yf = ((rb - lt) / 2).split(1, dim=dim)
     x, y = xf * cos - yf * sin, xf * sin + yf * cos
     xy = torch.cat([x, y], dim=dim) + anchor_points
     return torch.cat([xy, lt + rb], dim=dim)
+
+
+
+if __name__ == '__main__':
+     
+    assigner =  TaskAlignedAssigner(10,80,0.5,6)
+    tensors = torch.load('runs/debug_param/TaskAlignedAssigne.pt')
+# def forward(self, pd_class, pd_bboxes, anchor_points, gt_class, gt_bboxes, mask_gt_BT1)
+# 假设`assigner`是`TaskAlignedAssigner`的一个实例
+    _, target_bboxes_BA4matrix, mask_target_class_BACmatrix, mask_poss_sum_BAmetrics, _ = assigner(tensors['anchor_points'],
+                                                        tensors['pd_class'],
+                                                        tensors['pd_bboxes'],                                                        
+                                                        tensors['gt_class'],
+                                                        tensors['gt_bboxes'],
+                                                        tensors['mask_gt_BT1'])
+

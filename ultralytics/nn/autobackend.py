@@ -147,7 +147,7 @@ class AutoBackend(nn.Module):
 
         # PyTorch
         elif pt:
-            from ultralytics.nn.tasks import attempt_load_weights
+            from ultralytics.nn.tasks_model import attempt_load_weights
 
             model = attempt_load_weights(
                 weights if isinstance(weights, list) else w, device=device, inplace=True, fuse=fuse
