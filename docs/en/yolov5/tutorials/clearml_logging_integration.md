@@ -73,7 +73,7 @@ python train.py --img 640 --batch 16 --epochs 3 --data coco128.yaml --weights yo
 or with custom project and task_name name:
 
 ```bash
-python train.py --project my_project --name my_training --img 640 --batch 16 --epochs 3 --data coco128.yaml --weights yolov5s.pt --cache
+python train.py --project myProject --name my_training --img 640 --batch 16 --epochs 3 --data coco128.yaml --weights yolov5s.pt --cache
 ```
 
 This will capture:

@@ -15,7 +15,7 @@ import torchvision
 
 from ultralytics.data.augment import LetterBox
 from ultralytics.engine.engine_predictor import Engine_Predictor
-from ultralytics.engine.results import Results
+from ultralytics.utils.results import Results
 from ultralytics.utils import DEFAULT_PARAM, ops
 from ultralytics.utils.torch_utils import select_device
 from .amg import (
@@ -332,7 +332,7 @@ class Predictor(Engine_Predictor):
         """
         device = select_device(self.args.device, verbose=verbose)
         if model is None:
-            model = build_sam(self.args.model)
+            model = build_sam(self.args.model_str)
         model.eval()
         self.model = model.to(device)
         self.device = device
@@ -412,7 +412,7 @@ class Predictor(Engine_Predictor):
             AssertionError: If more than one image is set.
         """
         if self.model is None:
-            model = build_sam(self.args.model)
+            model = build_sam(self.args.model_str)
             self.setup_model(model)
         self.setup_source(image)
         assert len(self.dataset) == 1, "`set_image` only supports setting one image!"

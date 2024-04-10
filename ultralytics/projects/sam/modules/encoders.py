@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ultralytics.nn.common import LayerNorm2d, MLPBlock
+from ultralytics.nn.modules import LayerNorm2d, MLPBlock
 
 
 class ImageEncoderViT(nn.Module):

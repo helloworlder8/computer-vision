@@ -10,11 +10,11 @@ import torch
 
 from ultralytics.cfg_yaml import TASK_TO_DATA_CFG, creat_args, creat_save_dir
 from ultralytics.hub.utils import HUB_WEB_ROOT
-from ultralytics.nn.tasks_model import load_pytorch_model, creat_model_task_name, nn, creat_model_dict_add
+from ultralytics.nn.tasks import load_pytorch_model, creat_model_task_name, nn, creat_model_dict_add
 from ultralytics.utils import ASSETS, DEFAULT_PARAM_DICT, LOGGER, RANK, SETTINGS, callbacks, checks, emojis, yaml_load
 
 
-class Engine_Project(nn.Module):
+class Project_Engine(nn.Module):
 
     def __init__(self,model_str: Union[str, Path] = "yolov8n.pt",task_name: str = None,verbose: bool = False,) -> None: #yolov8n.yaml
         # yaml_pt
@@ -37,9 +37,9 @@ class Engine_Project(nn.Module):
 
         # Load or create new YOLO model
         if Path(model_str).suffix in (".yaml", ".yml"):
-            self._new_project(model_str, task_name=task_name, verbose=verbose)
+            self._newProject(model_str, task_name=task_name, verbose=verbose)
         else:
-            self._load_project(model_str, task_name=task_name)
+            self._loadProject(model_str, task_name=task_name)
 
 
 
@@ -82,7 +82,7 @@ class Engine_Project(nn.Module):
 
 
     """ 构造成员属性大模型 传入大模型的参数和任务 """
-    def _new_project(self, model_yaml: str, task_name=None, task=None, verbose=False) -> None:
+    def _newProject(self, model_yaml: str, task_name=None, task=None, verbose=False) -> None:
         # 创建模型字典
         model_dict = creat_model_dict_add(model_yaml)
 
@@ -99,11 +99,11 @@ class Engine_Project(nn.Module):
         self.model.task_name = self.task_name
 
 
-    def _load_project(self, model_pt: str, task_name=None) -> None:
+    def _loadProject(self, model_pt: str, task_name=None) -> None:
 
         suffix = Path(model_pt).suffix #'.pt'
         if suffix == ".pt":
-            self.model, self.ckpt = load_pytorch_model(model_pt)#'yolov8n.pt' ckpt还有要多少轮，最佳轮以及各种参数 model有权重str
+            self.model, self.ckpt = load_pytorch_model(model_pt)#'yolov8n.pt' ckpt还有要多少轮，最佳轮以及各种参数    模型参数（之前训练参数 ） 模型名称  模型任务名称
             self.model_str = self.model.model_str
             self.task_name = self.model.args["task_name"]
             self.overrides = self.model.args = self._reset_ckpt_args(self.model.args) #任务 数据配置 图像尺寸 单一类
@@ -112,7 +112,7 @@ class Engine_Project(nn.Module):
             self.model, self.ckpt = model_pt, None
             self.task_name = task_name or creat_model_task_name(model_pt)
             self.model_str = model_pt
-        self.overrides.update({"model_str": model_pt, "task_name": self.task_name})
+        self.overrides.update({"model_str": model_pt, "task_name": self.task_name}) #一个添加 一个修改
 
     def _check_is_pytorch_model(self) -> None:
         """Raises TypeError is model is not a PyTorch model."""
@@ -132,28 +132,29 @@ class Engine_Project(nn.Module):
         if kwargs is None:
             kwargs = {}
 
-        # 检查是否是 Ultralytics HUB 会话，并且已加载模型
+
         if hasattr(self.session, "model") and self.session.model.id:
-            # 如果传入了额外的参数，则警告并忽略这些参数
+
             if any(kwargs):
                 LOGGER.warning("WARNING ⚠️ using HUB training arguments, ignoring local training arguments.")
                 kwargs = self.session.train_args  # 使用 HUB 训练参数
 
         # 设置数据配置和模型配置参数
-        data_yaml = {"data_str": DEFAULT_PARAM_DICT["data_str"] or TASK_TO_DATA_CFG[self.task_name]} 
-        model_str = yaml_load(checks.check_yaml(kwargs.get("model_str", ""))) if kwargs.get("model_str") else self.overrides#模型附带任务猜测
-        args = {**data_yaml, **model_str, **kwargs, "mode": "train"}
+        data_yaml = {"data_str": DEFAULT_PARAM_DICT["data_str"] or TASK_TO_DATA_CFG[self.task_name]} #默认的
+        model_str = yaml_load(checks.check_yaml(kwargs.get("model_str", ""))) if kwargs.get("model_str") else self.overrides#有模型前面搭好的全作废
+        bool_resume = {"resume": DEFAULT_PARAM_DICT["resume"]} #默认
+        args = {**data_yaml, **model_str, **bool_resume, **kwargs, "mode": "train"}
 
-        # 如果存在恢复训练的标志，则设置恢复路径
+
         if args.get("resume"):
             args["resume"] = self.model_str
 
         # 初始化训练器
 
 
-        return args
+        return args #总参数
 
-    def _create_trainer(self, trainer, args):
+    def _create_trainer(self, trainer, args): #小参数
         # 创建任务对象
         trainer_cls = trainer or self._task_map("trainer") #<class 'ultralytics.projects.yolo.detect.train.Detection_Trainer'> 参数全传进回去了
         self.trainer = trainer_cls(overrides=args, _callbacks=self.callbacks)
@@ -161,7 +162,7 @@ class Engine_Project(nn.Module):
         # 设置模型
         # 如果不是恢复训练，则手动设置模型
         if not args.get("resume"): # detection_model = Detection_Model(model_dict, ch=ch, nc=self.data_dict["nc"], verbose=verbose and RANK == -1)
-            self.trainer.model = self.trainer.get_model(model_str=args["model_str"], model=self.model if self.ckpt else None)
+            self.trainer.model = self.trainer.build_model(model_str=args["model_str"], model=self.model if self.ckpt else None)
             self.model = self.trainer.model
             # else:
             #     self.trainer.model= self.model #TUDO
@@ -192,7 +193,7 @@ class Engine_Project(nn.Module):
 
         self._create_trainer(trainer, args) #小参数
 
-        self.trainer.prepare_train()
+        self.trainer.DDP_or_normally_train() #    def DDP_or_normally_train(self): #爸爸
 
         # 训练结束后，更新模型和配置
         if RANK in (-1, 0):
@@ -208,7 +209,7 @@ class Engine_Project(nn.Module):
 
     
 
-    def reset_weights(self) -> "Engine_Project":
+    def reset_weights(self) -> "Project_Engine":
         """
         Resets the model parameters to randomly initialized values, effectively discarding all training information.
 
@@ -230,7 +231,7 @@ class Engine_Project(nn.Module):
             p.requires_grad = True
         return self
 
-    def load(self, weights: Union[str, Path] = "yolov8n.pt") -> "Engine_Project":
+    def load(self, weights: Union[str, Path] = "yolov8n.pt") -> "Project_Engine":
         """
         Loads parameters from the specified weights file into the model.
 
@@ -442,10 +443,16 @@ class Engine_Project(nn.Module):
             AssertionError: If the model is not a PyTorch model.
         """
         custom = {"rect": True}  # method defaults
+        # 任务名 图像尺寸 单类 模型路径
         args = {**self.overrides, **custom, **kwargs, "mode": "val"}  # highest priority args on the right
 
-        validator = (validator or self._task_map("validator"))(args=args, _callbacks=self.callbacks)
-        validator(model=self.model)
+        # model_cls = task or self._task_map("model") #<class 'ultralytics.nn.tasks_model.Detection_Model'>
+        # self.model = model_cls(model_dict, verbose=verbose and RANK == -1)
+
+        validator_cls = validator or self._task_map("validator") #<class 'ultralytics.nn.tasks_model.Detection_Model'>
+        validator =validator_cls(args=args, _callbacks=self.callbacks) #mark class Detection_Model(Base_Model): #检测模型
+        # self.model这个模型是一开始就创建了
+        validator(model=self.model) #def __call__(self, trainer=None, model=None):主要就是加载这个模型
         self.metrics = validator.metrics
         return validator.metrics
 
@@ -454,26 +461,7 @@ class Engine_Project(nn.Module):
         **kwargs,
     ):
         """
-        Benchmarks the model across various export formats to evaluate performance.
 
-        This method assesses the model's performance in different export formats, such as ONNX, TorchScript, etc.
-        It uses the 'benchmark' function from the ultralytics.utils.benchmarks module. The benchmarking is configured
-        using a combination of default configuration values, model-specific arguments, method-specific defaults, and
-        any additional user-provided keyword arguments.
-
-        The method supports various arguments that allow customization of the benchmarking process, such as dataset
-        choice, image size, precision modes, device selection, and verbosity. For a comprehensive list of all
-        configurable options, users should refer to the 'configuration' section in the documentation.
-
-        Args:
-            **kwargs (any): Arbitrary keyword arguments to customize the benchmarking process. These are combined with
-                default configurations, model-specific arguments, and method defaults.
-
-        Returns:
-            (dict): A dictionary containing the results of the benchmarking process.
-
-        Raises:
-            AssertionError: If the model is not a PyTorch model.
         """
         self._check_is_pytorch_model()
         from ultralytics.utils.benchmarks import benchmark
@@ -534,13 +522,13 @@ class Engine_Project(nn.Module):
 
             return run_ray_tune(self, max_samples=iterations, *args, **kwargs)
         else:
-            from .tuner import Tuner
+            from .tuner_class import Tuner
 
             custom = {}  # method defaults
             args = {**self.overrides, **custom, **kwargs, "mode": "train"}  # highest priority args on the right
             return Tuner(args=args, _callbacks=self.callbacks)(model=self, iterations=iterations)
 
-    def _apply(self, fn) -> "Engine_Project":
+    def _apply(self, fn) -> "Project_Engine":
         """Apply to(), cpu(), cuda(), half(), float() to model tensors that are not parameters or registered buffers."""
         self._check_is_pytorch_model()
         self = super()._apply(fn)  # noqa
@@ -631,7 +619,7 @@ class Engine_Project(nn.Module):
     @staticmethod
     def _reset_ckpt_args(args: dict) -> dict:
         """Reset arguments when loading a PyTorch model."""
-        include = {"imgsz", "data", "task_name", "single_cls"}  # only remember these arguments when loading a PyTorch model
+        include = {"imgsz", "data_str", "task_name", "single_cls"}  # only remember these arguments when loading a PyTorch model
         return {k: v for k, v in args.items() if k in include}
 
     # def __getattr__(self, attr):

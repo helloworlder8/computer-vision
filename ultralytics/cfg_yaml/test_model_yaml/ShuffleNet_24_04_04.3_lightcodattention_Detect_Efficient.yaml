@@ -1,0 +1,81 @@
+
+
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# YOLOv8 object detection model with P3-P5 outputs. For Usage examples see https://docs.ultralytics.com/tasks/detect
+
+# Parameters
+nc: 80 # number of classes
+scales: # model compound scaling constants, i.e. 'model=yolov8n.yaml' will call yolov8.yaml with scale 'n'
+  # [depth, width, max_channels]
+  n: [1, 1, 1024] # YOLOv8n summary: 225 layers,  3157200 parameters,  3157184 gradients,   8.9 GFLOPs
+  s: [0.33, 0.50, 1024] # YOLOv8s summary: 225 layers, 11166560 parameters, 11166544 gradients,  28.8 GFLOPs
+  m: [0.67, 0.75, 768] # YOLOv8m summary: 295 layers, 25902640 parameters, 25902624 gradients,  79.3 GFLOPs
+  l: [1.00, 1.00, 512] # YOLOv8l summary: 365 layers, 43691520 parameters, 43691504 gradients, 165.7 GFLOPs
+  x: [1.00, 1.25, 512] # YOLOv8x summary: 365 layers, 68229648 parameters, 68229632 gradients, 258.5 GFLOPs
+
+# YOLOv8.0n backbone
+backbone:  #__init__(self, c1, c2, s, n=1, e=0.5, pool=False): #输入 输出 步长 内部多少个 类似botleneck结构 池化
+#              为了保证程序可靠运行并不添加程序复杂度   请保证in_channels*  split_ratio 可以被left_conv_group整除
+# def __init__(self, in_channels, out_channels, split_ratio=0.2, stride=1, conv_or_identity=0,conv_poolconv_pool=0,left_conv_group=1,right_bottleneckratio=1): 
+  - [-1, 1, Focus, [8, 3, 1]] #    8 320 320                          0
+  - [-1, 1, Conv, [16, 3, 1]] #    16 320 320                         1
+  - [-1, 1, Conv, [32, 3, 2]] #    32 160 160                         2
+
+                        # 输出 比例 步长 1  2   分组 瓶子
+  - [-1, 1, ShuffleNetV3, [64, 0.4, 2, -1, 0, 0.3, 0.6]] #    64 80 80          3
+                                #     从小到大 从小到大 从大到小
+
+  - [-1, 1, ShuffleNetV3, [128, 0.5, 1, 0, -1 ,0.5, 0.5]] #    128 80 80        4 拼接
+
+  - [-1, 1, ShuffleNetV3, [128, 0.6, 2, -1, 1 ,0.5, 0.4]] #    128 40 40         5
+  - [-1, 1, ShuffleNetV3, [128, 0.6, 1,  0, -1,0.5, 0.4]] #    128 40 40    64   6拼接
+
+
+  - [-1, 1, ShuffleNetV3, [128, 0.6, 2, -1, 1, 0.5, 0.4]] # 128 20 20   7
+  - [-1, 1, SPPF, [128, 5]]                               # 128 20 20   8 拼接
+
+# YOLOv8.0n head
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]] #128 40 40               9
+  - [[-1, 6], 1, Concat, [1]]                 # 256 40 40               10
+
+
+  - [-1, 1, ShuffleNetV3, [128, 0.3, 1, 1, -1, -1, 0.4]] #  128 40 40     11拼接
+
+
+
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]] #128 80 80                 12
+
+  - [[-1, 4], 1, Concat, [1]] # cat backbone P3  #128 80 80 + 128 80 80 =  256 80 80      13
+
+
+# nn.MaxPool2d(kernel_size=k, stride=1, padding=k // 2)
+  - [-1, 1, ShuffleNetV3, [128, 0.3, 1, 1, -1, -1, 0.5]] #  256 80 80                     14 出
+
+
+  - [-1, 1, nn.MaxPool2d, [5, 2, 2]]  # 256 40 40                               15
+  - [-1, 1, Conv, [128, 1, 1,None,64]]  # 128 40 40                             16
+
+
+  - [[-1,11], 1, Concat, [1]]  # 128 40 40 +128 40 40 = 256 40 40               17
+  - [-1, 1, CoordAtt, [256]] 
+
+
+  - [-1, 1, ShuffleNetV3, [128, 0.3, 1, 1, -1, -1, 0.5]] #  256 40 40                    18   出
+
+  - [-1, 1, nn.MaxPool2d, [5, 2, 2]]              # 256 20 20                             19
+  - [-1, 1, Conv, [128, 1, 1,None,64]]  # 128 40 40                                       20
+
+
+  - [[-1, 8], 1, Concat, [1]]                   #256 20 20                                  21  
+
+
+
+  - [-1, 1, ShuffleNetV3, [128, 0.3, 1, 1, -1, -1, 0.5]] #  256 40 40                      22 出
+
+  - [[14, 19, 23], 1, Detect_improve, [nc]] # Detect(P3, P4, P5)                                     23
+
+
+
+# Model summary: 209 layers, 1390700 parameters, 1390684 gradients

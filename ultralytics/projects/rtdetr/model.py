@@ -9,15 +9,15 @@ For more information on RT-DETR, visit: https://arxiv.org/pdf/2304.08069.pdf
 
 from pathlib import Path
 
-from ultralytics.engine.engine_project import Engine_Project
-from ultralytics.nn.tasks_model import RTDETRDetectionModel
+from ultralytics.engine.engine_project import Project_Engine
+from ultralytics.nn.tasks import RTDETRDetectionModel
 
 from .predict import RTDETRPredictor
 from .train import RTDETRTrainer
 from .val import RTDETRValidator
 
 
-class RTDETR(Engine_Project):
+class RTDETR(Project_Engine):
     """
     Interface for Baidu's RT-DETR model. This Vision Transformer-based object detector provides real-time performance
     with high accuracy. It supports efficient hybrid encoding, IoU-aware query selection, and adaptable inference speed.

@@ -10,7 +10,7 @@ import torch.nn as nn
 from ultralytics.data import creat_dataloader, create_dataset
 from ultralytics.engine.engine_trainer import Engine_Trainer
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks_model import Detection_Model,creat_model_dict_add
+from ultralytics.nn.tasks import Detection_Model,creat_model_dict_add
 from ultralytics.utils import LOGGER, RANK
 from ultralytics.utils.plotting import plot_images, plot_labels, plot_results
 from ultralytics.utils.torch_utils import de_parallel, torch_distributed_zero_first
@@ -31,11 +31,11 @@ class Detection_Trainer(Engine_Trainer): #目标检测的训练 好多数据都�
         assert mode in ["train", "val"]
         with torch_distributed_zero_first(rank):  # init yolo_dataset *.cache only once if DDP
             gs = max(int(de_parallel(self.model).stride.max() if self.model else 0), 32) #32
-            with open('trainer_args.json', 'w') as file:
-                json.dump(vars(self.args), file)  # Convert Namespace to dict and save
-            data_dic_serializable = {key: str(value) if isinstance(value, Path) else value for key, value in self.data_dict.items()}
-            with open('data_dict.json', 'w') as file:
-                json.dump(data_dic_serializable, file)
+            # with open('trainer_args.json', 'w') as file:
+            #     json.dump(vars(self.args), file)  # Convert Namespace to dict and save
+            # data_dic_serializable = {key: str(value) if isinstance(value, Path) else value for key, value in self.data_dict.items()}
+            # with open('data_dict.json', 'w') as file:
+            #     json.dump(data_dic_serializable, file)
             # 参数 数据集路径 数据字典 总批次 步长 模式 矩形数据
             yolo_dataset = create_dataset(self.args, dataset_sp, self.data_dict, batch_size, stride=gs, mode=mode, rect=mode == "val")
 
@@ -77,7 +77,7 @@ class Detection_Trainer(Engine_Trainer): #目标检测的训练 好多数据都�
         self.model.args = self.args  # attach hyperparameters to model
 
 
-    def get_model(self, model_str=None, model=None, verbose=True):
+    def build_model(self, model_str=None, model=None, verbose=True):
         """Return a YOLO detection task."""
         model_dict = creat_model_dict_add(model_str)
         detection_model = Detection_Model(model_dict, ch=self.data_dict["ch"], nc=self.data_dict["nc"], verbose=verbose and RANK == -1) #mark 模型 通道 数据 mdoel_dict 传参 data_dict
@@ -88,7 +88,7 @@ class Detection_Trainer(Engine_Trainer): #目标检测的训练 好多数据都�
     def get_validator(self):
         """Returns a Detection_Validator for YOLO model validation."""
         self.loss_names = "box_loss", "cls_loss", "dfl_loss"
-        return yolo.detect.Detection_Validator(self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks)
+        return yolo.detect.Detection_Validator(self.test_dataloader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks)
 
     def label_loss_items(self, loss_items=None, prefix="train"):
         """
@@ -125,14 +125,14 @@ class Detection_Trainer(Engine_Trainer): #目标检测的训练 好多数据都�
             on_plot=self.on_plot,
         )
 
-    def plot_metrics(self):
+    def plot_result_metrics(self):
         """Plots metrics from a CSV file."""
         plot_results(file=self.csv, on_plot=self.on_plot)  # save results.png
 
     def plot_training_labels(self):
         """Create a labeled training plot of the YOLO model."""
-        boxes = np.concatenate([lb["bboxes"] for lb in self.train_loader.dataset.labels_dict], 0) #(2320, 4) 所有的边界框
-        cls = np.concatenate([lb["cls"] for lb in self.train_loader.dataset.labels_dict], 0)      #(2320, 1) 所有的类别
+        boxes = np.concatenate([lb["bboxes"] for lb in self.train_dataloader.dataset.labels_dict], 0) #(2320, 4) 所有的边界框
+        cls = np.concatenate([lb["cls"] for lb in self.train_dataloader.dataset.labels_dict], 0)      #(2320, 1) 所有的类别
         plot_labels(boxes, cls.squeeze(), names=self.data_dict["names"], save_dir=self.save_dir, on_plot=self.on_plot)
         # 标签 类别 保存路径 画画
 

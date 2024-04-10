@@ -28,7 +28,7 @@ import numpy as np
 import torch
 
 from ultralytics.cfg_yaml import creat_args, creat_save_dir
-from ultralytics.data.utils import check_cls_dataset, check_dataset
+from ultralytics.data.verify import check_cls_dataset, check_detect_dataset
 from ultralytics.nn.autobackend import AutoBackend
 from ultralytics.utils import LOGGER, TQDM, callbacks, colorstr, emojis
 from ultralytics.utils.checks import check_imgsz
@@ -50,7 +50,7 @@ class Engine_Validator: #分类和检测验证
             args (SimpleNamespace): Configuration for the validator.
             _callbacks (dict): Dictionary to store various callback functions.
         """
-        self.args = creat_args(overrides=args)
+        self.args = creat_args(overrides=args) #参数全覆盖
         self.dataloader = dataloader
         self.pbar = pbar
         self.stride = None
@@ -67,7 +67,7 @@ class Engine_Validator: #分类和检测验证
         self.jdict = None
         self.speed = {"preprocess": 0.0, "inference": 0.0, "loss": 0.0, "postprocess": 0.0}
 
-        self.save_dir = save_dir or creat_save_dir(self.args)
+        self.save_dir = save_dir or creat_save_dir(self.args) #加了保存路径
         (self.save_dir / "labels" if self.args.save_txt else self.save_dir).mkdir(parents=True, exist_ok=True)
         if self.args.conf is None:
             self.args.conf = 0.001  # default conf=0.001
@@ -82,7 +82,7 @@ class Engine_Validator: #分类和检测验证
         gets priority).
         """
         self.training = trainer is not None
-        augment = self.args.augment and (not self.training)
+        augment = self.args.augment and (not self.training) #不加强
         if self.training:
             self.device = trainer.device
             self.data_dict = trainer.data_dict
@@ -91,12 +91,12 @@ class Engine_Validator: #分类和检测验证
             model = model.half() if self.args.half else model.float()
             # self.model = model
             self.loss = torch.zeros_like(trainer.loss_items, device=trainer.device)
-            self.args.plots &= trainer.stopper.possible_stop or (trainer.epoch == trainer.epochs - 1)
+            self.args.plots &= trainer.stopper.possible_stop or (trainer.current_epoch == trainer.epochs - 1)
             model.eval()
         else:
             callbacks.add_integration_callbacks(self)
             model = AutoBackend(
-                weights=model or self.args.model,
+                weights=model or self.args.model_str,
                 device=select_device(self.args.device, self.args.batch),
                 dnn=self.args.dnn,
                 data=self.args.data_str,
@@ -114,7 +114,7 @@ class Engine_Validator: #分类和检测验证
                 LOGGER.info(f"Forcing batch=1 square inference (1,3,{imgsz},{imgsz}) for non-PyTorch models")
 
             if str(self.args.data_str).split(".")[-1] in ("yaml", "yml"):
-                self.data_dict = check_dataset(self.args.data_str)
+                self.data_dict = check_detect_dataset(self.args.data_str)
             elif self.args.task_name == "classify":
                 self.data_dict = check_cls_dataset(self.args.data_str, split=self.args.split)
             else:
@@ -155,7 +155,7 @@ class Engine_Validator: #分类和检测验证
             # Loss
             with dt[2]:
                 if self.training:
-                    self.loss += model.loss(batch, preds)[1]
+                    self.loss += model.computer_loss(batch, preds)[1]
 
             # Postprocess
             with dt[3]:

@@ -75,8 +75,8 @@ def _create_experiment(args):
         return
     try:
         comet_mode = _get_comet_mode()
-        _project_name = os.getenv("COMET_PROJECT_NAME", args.project)
-        experiment = _get_experiment_type(comet_mode, _project_name)
+        Project_name = os.getenv("COMETProject_NAME", args.project)
+        experiment = _get_experiment_type(comet_mode, Project_name)
         experiment.log_parameters(vars(args))
         experiment.log_others(
             {
@@ -96,7 +96,7 @@ def _fetch_trainer_metadata(trainer):
     """Returns metadata for YOLO training including epoch and asset saving status."""
     curr_epoch = trainer.epoch + 1
 
-    train_num_steps_per_epoch = len(trainer.train_loader.dataset) // trainer.batch_size
+    train_num_steps_per_epoch = len(trainer.train_dataloader.dataset) // trainer.batch_size
     curr_step = curr_epoch * train_num_steps_per_epoch
     final_epoch = curr_epoch == trainer.epochs
 

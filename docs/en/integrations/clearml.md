@@ -68,7 +68,7 @@ Before diving into the usage instructions, be sure to check out the range of [YO
 
         # Step 1: Creating a ClearML Task
         task_name = Task.init(
-            project_name="my_project",
+            project_name="myProject",
             task_name="my_yolov8_task"
         )
 

@@ -15,13 +15,13 @@ from pathlib import Path
 
 import torch
 
-from ultralytics.engine.engine_project import Engine_Project
+from ultralytics.engine.engine_project import Project_Engine
 from ultralytics.utils.torch_utils import model_info, smart_inference_mode
 from .predict import NASPredictor
 from .val import NASValidator
 
 
-class NAS(Engine_Project):
+class NAS(Project_Engine):
     """
     YOLO NAS model for object detection.
 
@@ -49,7 +49,7 @@ class NAS(Engine_Project):
         super().__init__(model, task_name="detect")
 
     @smart_inference_mode()
-    def _load_project(self, weights: str, task_name: str):
+    def _loadProject(self, weights: str, task_name: str):
         """Loads an existing NAS model weights or creates a new NAS model with pretrained weights if not provided."""
         import super_gradients
 

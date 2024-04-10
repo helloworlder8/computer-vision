@@ -2,7 +2,7 @@
 
 import torch
 
-from ultralytics.engine.results import Results
+from ultralytics.utils.results import Results
 from ultralytics.projects.fastsam.utils import bbox_iou
 from ultralytics.projects.yolo.detect.detection_predictor import Detection_Predictor
 from ultralytics.utils import DEFAULT_PARAM, ops

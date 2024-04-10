@@ -223,8 +223,8 @@ def model_info(model, detailed=False, verbose=True, imgsz=640):
     flops = get_flops(model, imgsz)
     fused = " (fused)" if getattr(model, "is_fused", lambda: False)() else ""  # "" 
     fs = f", {flops:.1f} GFLOPs" if flops else ""
-    yaml_file = getattr(model, "yaml_file", "") or getattr(model, "yaml", {}).get("yaml_file", "") #"" 
-    model_name = Path(yaml_file).stem.replace("yolo", "YOLO") or "Model" #"Model"
+    data_str = getattr(model, "data_str", "") or getattr(model, "yaml", {}).get("data_str", "") #"" 
+    model_name = Path(data_str).stem.replace("yolo", "YOLO") or "Model" #"Model"
     LOGGER.info(f"{model_name} summary{fused}: {n_l} layers, {n_p} parameters, {n_g} gradients{fs}")
     return n_l, n_p, n_g, flops
 
@@ -431,47 +431,53 @@ class ModelEMA:
             copy_attr(self.ema, model, include, exclude)
 
 
-def strip_optimizer(f: Union[str, Path] = "best.pt", s: str = "") -> None:
+def strip_optimizer(model_sp: Union[str, Path] = "best.pt", current_epoch: int = -1, s: str = "") -> None:
     """
-    Strip optimizer from 'f' to finalize training, optionally save as 's'.
+    Removes the optimizer, EMA, updates, and optionally updates the epoch from a saved model.
 
     Args:
-        f (str): file path to model to strip the optimizer from. Default is 'best.pt'.
-        s (str): file path to save the model with stripped optimizer to. If not provided, 'f' will be overwritten.
-
-    Returns:
-        None
-
-    Example:
-        ```python
-        from pathlib import Path
-        from ultralytics.utils.torch_utils import strip_optimizer
-
-        for f in Path('path/to/weights').rglob('*.pt'):
-            strip_optimizer(f)
-        ```
+        model_sp (Union[str, Path]): The path to the saved model.
+        current_epoch (int): The current epoch to set in the model's checkpoint.
+        s (str): The path to save the stripped model. If not specified, overwrite the original model.
     """
-    x = torch.load(f, map_location=torch.device("cpu"))
-    if "model" not in x:
-        LOGGER.info(f"Skipping {f}, not a valid Ultralytics model.")
-        return
+    # Load the checkpoint
+    ckpt = torch.load(model_sp, map_location=torch.device("cpu"))
+    if "model" not in ckpt:
+        LOGGER.info(f"Skipping {model_sp}, not a valid Ultralytics model.")
+        return 
 
-    if hasattr(x["model"], "args"):
-        x["model"].args = dict(x["model"].args)  # convert from IterableSimpleNamespace to dict
-    args = {**DEFAULT_PARAM_DICT, **x["train_args"]} if "train_args" in x else None  # combine args
-    if x.get("ema"):
-        x["model"] = x["ema"]  # replace model with ema
-    for k in "optimizer", "best_fitness", "ema", "updates":  # keys
-        x[k] = None
-    x["epoch"] = -1
-    x["model"].half()  # to FP16
-    for p in x["model"].parameters():
+    # Ensure model.args is a dict
+    if hasattr(ckpt["model"], "args"):
+        ckpt["model"].args = dict(ckpt["model"].args)
+
+    # Combine args
+    train_args = {**DEFAULT_PARAM_DICT, **ckpt["train_args"]} if "train_args" in ckpt else None   # Replace model with EMA if exists
+    if ckpt.get("ema"):
+        ckpt["model"] = ckpt["ema"]
+
+    # Remove unwanted keys
+    for key in ["optimizer", "best_fitness", "ema", "updates"]:
+        ckpt[key] = None
+
+
+    ckpt["epoch"] = current_epoch
+
+    # Convert model to FP16 and disable gradients
+    ckpt["model"].half()
+    for p in ckpt["model"].parameters():
         p.requires_grad = False
-    x["train_args"] = {k: v for k, v in args.items() if k in DEFAULT_CFG_KEYS}  # strip non-default keys
-    # x['model'].args = x['train_args']
-    torch.save(x, s or f)
-    mb = os.path.getsize(s or f) / 1e6  # file size
-    LOGGER.info(f"Optimizer stripped from {f},{f' saved as {s},' if s else ''} {mb:.1f}MB")
+
+    # Keep only default args
+    ckpt["train_args"] = {k: v for k, v in train_args.items() if k in DEFAULT_CFG_KEYS}
+
+    # Save the stripped checkpoint
+    save_path = s or model_sp
+    torch.save(ckpt, save_path)
+
+    # Log the result
+    mb = os.path.getsize(save_path) / 1e6  # file size in MB
+    LOGGER.info(f"Optimizer stripped from {model_sp},{f' saved as {s},' if s else ''} {mb:.1f}MB")
+
 
 
 def profile(input, ops, n=10, device=None):

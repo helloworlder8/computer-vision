@@ -304,7 +304,7 @@ Explorer API can be used to explore datasets with advanced semantic, vector-simi
 
         # trainer
         trainer = Detection_Trainer(overrides={})
-        trainer.prepare_train()
+        trainer.DDP_or_normally_train()
         trained_model = trainer.best
 
         # Validator

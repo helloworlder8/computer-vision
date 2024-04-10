@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ultralytics.data import creat_dataloader, create_dataset, converter
+from ultralytics.data import creat_dataloader, create_dataset, dataset_convert
 from ultralytics.engine.engine_validator import Engine_Validator
 from ultralytics.utils import LOGGER, ops
 from ultralytics.utils.checks import check_requirements
@@ -68,7 +68,7 @@ class Detection_Validator(Engine_Validator):
         """Initialize evaluation metrics for YOLO."""
         val = self.data_dict.get(self.args.split, "")  # validation path
         self.is_coco = isinstance(val, str) and "coco" in val and val.endswith(f"{os.sep}val2017.txt")  # is COCO
-        self.class_map = converter.coco80_to_coco91_class() if self.is_coco else list(range(1000))
+        self.class_map = dataset_convert.coco80_to_coco91_class() if self.is_coco else list(range(1000))
         self.args.save_json |= self.is_coco and not self.training  # run on final val if training COCO
         self.names = model.names
         self.nc = len(model.names)

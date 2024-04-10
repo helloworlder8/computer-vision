@@ -13,8 +13,8 @@ from pandas import DataFrame
 from tqdm import tqdm
 
 from ultralytics.data.augment import Format
-from ultralytics.data.dataset import YOLO_Dataset
-from ultralytics.data.utils import check_dataset
+from ultralytics.data.special_dataset import YOLO_Dataset
+from ultralytics.data.verify import check_detect_dataset
 from ultralytics.projects.yolo.project_yolo import YOLO
 from ultralytics.utils import LOGGER, IterableSimpleNamespace, checks, USER_CONFIG_DIR
 from .utils import get_sim_index_schema, get_table_schema, plot_query_result, prompt_sql_query, sanitize_batch
@@ -101,7 +101,7 @@ class Explorer:
         if self.data is None:
             raise ValueError("Data must be provided to create embeddings table")
 
-        data_info = check_dataset(self.data)
+        data_info = check_detect_dataset(self.data)
         if split not in data_info:
             raise ValueError(
                 f"Split {split} is not found in the dataset. Available keys in the dataset are {list(data_info.keys())}"

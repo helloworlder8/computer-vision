@@ -212,13 +212,13 @@ def _type_and_value_checks(args):
 def creat_save_dir(args, name=None):
     """Return save_dir as created from train/val/predict arguments."""
 
-    if getattr(args, "save_dir", None):
+    if getattr(args, "save_dir", None): #告诉名称以名称为主
         save_dir = args.save_dir
     else:
         from ultralytics.utils.files import increment_path
         
         project = args.project or (ROOT.parent / "tests/tmp/runs" if TESTS_RUNNING else RUNS_DIR) / args.task_name #运行路径加任务名
-        name = name or args.name or f"{args.mode}" #这种索引方式值得学习
+        name = name or args.name or f"{args.mode}" #这种索引方式值得学习 穿名 参名 模式
         save_dir = increment_path(Path(project) / name, exist_ok=args.exist_ok if RANK in (-1, 0) else True)
 
     return Path(save_dir)
@@ -248,8 +248,8 @@ def check_dict_alignment(default_param: Dict, overrides: Dict, e=None):
 
     overrides = _handle_deprecation(overrides)
     default_keys, overrides_keys = (set(x.keys()) for x in (default_param, overrides)) #104 5
-    mismatched = [k for k in overrides_keys if k not in default_keys]
-    if mismatched:
+    mismatched = [k for k in overrides_keys if k not in default_keys] #overrides_keys有但是default_keys没有
+    if mismatched: #[]才正常
         from difflib import get_close_matches
 
         string = ""

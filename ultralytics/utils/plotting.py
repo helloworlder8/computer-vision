@@ -13,8 +13,8 @@ from PIL import Image, ImageDraw, ImageFont
 from PIL import __version__ as pil_version
 
 from ultralytics.utils import LOGGER, TryExcept, ops, plt_settings, threaded
-from .checks import check_font, check_version, is_ascii
-from .files import increment_path
+from ultralytics.utils.checks import check_font, check_version, is_ascii
+from ultralytics.utils.files import increment_path
 
 
 class Colors:
@@ -88,9 +88,9 @@ class Colors:
         return (c[2], c[1], c[0]) if bgr else c
 
     @staticmethod
-    def hex2rgb(h):
+    def hex2rgb(height):
         """Converts hex color codes to RGB values (i.e. default PIL order)."""
-        return tuple(int(h[1 + i : 1 + i + 2], 16) for i in (0, 2, 4))
+        return tuple(int(height[1 + i : 1 + i + 2], 16) for i in (0, 2, 4))
 
 
 colors = Colors()  # create instance for 'from utils.plots import colors'
@@ -125,7 +125,7 @@ class Annotator:
                 self.font = ImageFont.truetype(str(font), size)
             except Exception:
                 self.font = ImageFont.load_default()
-            # Deprecation fix for w, h = getsize(string) -> _, _, w, h = getbox(string)
+            # Deprecation fix for width, height = getsize(string) -> _, _, width, height = getbox(string)
             if check_version(pil_version, "9.2.0"):
                 self.font.getsize = lambda x: self.font.getbbox(x)[2:4]  # text width, height
         else:  # use cv2
@@ -172,14 +172,14 @@ class Annotator:
                 p1 = (box[0], box[1])
                 self.draw.rectangle(box, width=self.lw, outline=color)  # box
             if label:
-                w, h = self.font.getsize(label)  # text width, height
-                outside = p1[1] - h >= 0  # label fits outside box
+                width, height = self.font.getsize(label)  # text width, height
+                outside = p1[1] - height >= 0  # label fits outside box
                 self.draw.rectangle(
-                    (p1[0], p1[1] - h if outside else p1[1], p1[0] + w + 1, p1[1] + 1 if outside else p1[1] + h + 1),
+                    (p1[0], p1[1] - height if outside else p1[1], p1[0] + width + 1, p1[1] + 1 if outside else p1[1] + height + 1),
                     fill=color,
                 )
                 # self.draw.text((box[0], box[1]), label, fill=txt_color, font=self.font, anchor='ls')  # for PIL>8.0
-                self.draw.text((p1[0], p1[1] - h if outside else p1[1]), label, fill=txt_color, font=self.font)
+                self.draw.text((p1[0], p1[1] - height if outside else p1[1]), label, fill=txt_color, font=self.font)
         else:  # cv2
             if rotated:
                 p1 = [int(b) for b in box[0]]
@@ -189,14 +189,14 @@ class Annotator:
                 p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
                 cv2.rectangle(self.im, p1, p2, color, thickness=self.lw, lineType=cv2.LINE_AA)
             if label:
-                w, h = cv2.getTextSize(label, 0, fontScale=self.sf, thickness=self.tf)[0]  # text width, height
-                outside = p1[1] - h >= 3
-                p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
+                width, height = cv2.getTextSize(label, 0, fontScale=self.sf, thickness=self.tf)[0]  # text width, height
+                outside = p1[1] - height >= 3
+                p2 = p1[0] + width, p1[1] - height - 3 if outside else p1[1] + height + 3
                 cv2.rectangle(self.im, p1, p2, color, -1, cv2.LINE_AA)  # filled
                 cv2.putText(
                     self.im,
                     label,
-                    (p1[0], p1[1] - 2 if outside else p1[1] + h + 2),
+                    (p1[0], p1[1] - 2 if outside else p1[1] + height + 2),
                     0,
                     self.sf,
                     txt_color,
@@ -209,9 +209,9 @@ class Annotator:
         Plot masks on image.
 
         Args:
-            masks (tensor): Predicted masks on cuda, shape: [n, h, w]
+            masks (tensor): Predicted masks on cuda, shape: [n, height, width]
             colors (List[List[Int]]): Colors for predicted masks, [[r, g, b] * n]
-            im_gpu (tensor): Image is in cuda, shape: [3, h, w], range: [0, 1]
+            im_gpu (tensor): Image is in cuda, shape: [3, height, width], range: [0, 1]
             alpha (float): Mask transparency: 0.0 fully transparent, 1.0 opaque
             retina_masks (bool): Whether to use high resolution masks or not. Defaults to False.
         """
@@ -224,14 +224,14 @@ class Annotator:
             im_gpu = im_gpu.to(masks.device)
         colors = torch.tensor(colors, device=masks.device, dtype=torch.float32) / 255.0  # shape(n,3)
         colors = colors[:, None, None]  # shape(n,1,1,3)
-        masks = masks.unsqueeze(3)  # shape(n,h,w,1)
-        masks_color = masks * (colors * alpha)  # shape(n,h,w,3)
+        masks = masks.unsqueeze(3)  # shape(n,height,width,1)
+        masks_color = masks * (colors * alpha)  # shape(n,height,width,3)
 
-        inv_alpha_masks = (1 - masks * alpha).cumprod(0)  # shape(n,h,w,1)
-        mcs = masks_color.max(dim=0).values  # shape(n,h,w,3)
+        inv_alpha_masks = (1 - masks * alpha).cumprod(0)  # shape(n,height,width,1)
+        mcs = masks_color.max(dim=0).values  # shape(n,height,width,3)
 
         im_gpu = im_gpu.flip(dims=[0])  # flip channel
-        im_gpu = im_gpu.permute(1, 2, 0).contiguous()  # shape(h,w,3)
+        im_gpu = im_gpu.permute(1, 2, 0).contiguous()  # shape(height,width,3)
         im_gpu = im_gpu * inv_alpha_masks[-1] + mcs
         im_mask = im_gpu * 255
         im_mask_np = im_mask.byte().cpu().numpy()
@@ -246,7 +246,7 @@ class Annotator:
 
         Args:
             kpts (tensor): Predicted keypoints with shape [17, 3]. Each keypoint has (x, y, confidence).
-            shape (tuple): Image shape as a tuple (h, w), where h is the height and w is the width.
+            shape (tuple): Image shape as a tuple (height, width), where height is the height and width is the width.
             radius (int, optional): Radius of the drawn keypoints. Default is 5.
             kpt_line (bool, optional): If True, the function will draw lines connecting keypoints
                                        for human pose. Default is True.
@@ -296,27 +296,27 @@ class Annotator:
     def text(self, xy, text, txt_color=(255, 255, 255), anchor="top", box_style=False):
         """Adds text to an image using PIL or cv2."""
         if anchor == "bottom":  # start y from font bottom
-            w, h = self.font.getsize(text)  # text width, height
-            xy[1] += 1 - h
+            width, height = self.font.getsize(text)  # text width, height
+            xy[1] += 1 - height
         if self.pil:
             if box_style:
-                w, h = self.font.getsize(text)
-                self.draw.rectangle((xy[0], xy[1], xy[0] + w + 1, xy[1] + h + 1), fill=txt_color)
+                width, height = self.font.getsize(text)
+                self.draw.rectangle((xy[0], xy[1], xy[0] + width + 1, xy[1] + height + 1), fill=txt_color)
                 # Using `txt_color` for background and draw fg with white color
                 txt_color = (255, 255, 255)
             if "\n" in text:
                 lines = text.split("\n")
-                _, h = self.font.getsize(text)
+                _, height = self.font.getsize(text)
                 for line in lines:
                     self.draw.text(xy, line, fill=txt_color, font=self.font)
-                    xy[1] += h
+                    xy[1] += height
             else:
                 self.draw.text(xy, text, fill=txt_color, font=self.font)
         else:
             if box_style:
-                w, h = cv2.getTextSize(text, 0, fontScale=self.sf, thickness=self.tf)[0]  # text width, height
-                outside = xy[1] - h >= 3
-                p2 = xy[0] + w, xy[1] - h - 3 if outside else xy[1] + h + 3
+                width, height = cv2.getTextSize(text, 0, fontScale=self.sf, thickness=self.tf)[0]  # text width, height
+                outside = xy[1] - height >= 3
+                p2 = xy[0] + width, xy[1] - height - 3 if outside else xy[1] + height + 3
                 cv2.rectangle(self.im, xy, p2, txt_color, -1, cv2.LINE_AA)  # filled
                 # Using `txt_color` for background and draw fg with white color
                 txt_color = (255, 255, 255)
@@ -715,7 +715,26 @@ def plot_images(
     max_subplots=16,
     save=True,
     conf_thres=0.25,
+    save_params_path=None, 
 ):
+    if save_params_path:
+        params = {
+            "images": images,
+            "batch_idx": batch_idx,
+            "cls": cls,
+            "bboxes": bboxes,
+            "confs": confs,
+            "masks": masks,
+            "kpts": kpts,
+            "paths": paths,
+            "fname": fname,
+            "names": names,
+            "max_subplots": max_subplots,
+            "save": save,
+            "conf_thres": conf_thres
+        }
+        torch.save(params, "/home/gcsx/ANG/ultralytics-24-03-27/debug_param/plot_images.pt")
+
     """Plot image grid with labels."""
     if isinstance(images, torch.Tensor):
         images = images.cpu().float().numpy()
@@ -731,31 +750,31 @@ def plot_images(
         batch_idx = batch_idx.cpu().numpy()
 
     max_size = 1920  # max image size
-    bs, _, h, w = images.shape  # batch size, _, height, width
-    bs = min(bs, max_subplots)  # limit plot images
-    ns = np.ceil(bs**0.5)  # number of subplots (square)
+    batch_size, _, height, width = images.shape  # batch size, _, height, width
+    subplots_size = min(batch_size, max_subplots)  # limit plot images  最大画16张图片
+    ns = np.ceil(subplots_size**0.5)  # number of subplots (square)
     if np.max(images[0]) <= 1:
         images *= 255  # de-normalise (optional)
 
     # Build Image
-    mosaic = np.full((int(ns * h), int(ns * w), 3), 255, dtype=np.uint8)  # init
-    for i in range(bs):
-        x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
-        mosaic[y : y + h, x : x + w, :] = images[i].transpose(1, 2, 0)
+    mosaic = np.full((int(ns * height), int(ns * width), 3), 255, dtype=np.uint8)  # init
+    for i in range(subplots_size):
+        x, y = int(width * (i // ns)), int(height * (i % ns))  # block origin
+        mosaic[y : y + height, x : x + width, :] = images[i].transpose(1, 2, 0)
 
     # Resize (optional)
-    scale = max_size / ns / max(h, w)
+    scale = max_size / ns / max(height, width)
     if scale < 1:
-        h = math.ceil(scale * h)
-        w = math.ceil(scale * w)
-        mosaic = cv2.resize(mosaic, tuple(int(x * ns) for x in (w, h)))
+        height = math.ceil(scale * height)
+        width = math.ceil(scale * width)
+        mosaic = cv2.resize(mosaic, tuple(int(x * ns) for x in (width, height)))
 
     # Annotate
-    fs = int((h + w) * ns * 0.01)  # font size
+    fs = int((height + width) * ns * 0.01)  # font size
     annotator = Annotator(mosaic, line_width=round(fs / 10), font_size=fs, pil=True, example=names)
-    for i in range(bs):
-        x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
-        annotator.rectangle([x, y, x + w, y + h], None, (255, 255, 255), width=2)  # borders
+    for i in range(subplots_size):
+        x, y = int(width * (i // ns)), int(height * (i % ns))  # block origin
+        annotator.rectangle([x, y, x + width, y + height], None, (255, 255, 255), width=2)  # borders
         if paths:
             annotator.text((x + 5, y + 5), text=Path(paths[i]).name[:40], txt_color=(220, 220, 220))  # filenames
         if len(cls) > 0:
@@ -770,8 +789,8 @@ def plot_images(
                 boxes = ops.xywhr2xyxyxyxy(boxes) if is_obb else ops.xywh2xyxy(boxes)
                 if len(boxes):
                     if boxes[:, :4].max() <= 1.1:  # if normalized with tolerance 0.1
-                        boxes[..., 0::2] *= w  # scale to pixels
-                        boxes[..., 1::2] *= h
+                        boxes[..., 0::2] *= width  # scale to pixels
+                        boxes[..., 1::2] *= height
                     elif scale < 1:  # absolute coords need scale if image scales
                         boxes[..., :4] *= scale
                 boxes[..., 0::2] += x
@@ -795,8 +814,8 @@ def plot_images(
                 kpts_ = kpts[idx].copy()
                 if len(kpts_):
                     if kpts_[..., 0].max() <= 1.01 or kpts_[..., 1].max() <= 1.01:  # if normalized with tolerance .01
-                        kpts_[..., 0] *= w  # scale to pixels
-                        kpts_[..., 1] *= h
+                        kpts_[..., 0] *= width  # scale to pixels
+                        kpts_[..., 1] *= height
                     elif scale < 1:  # absolute coords need scale if image scales
                         kpts_ *= scale
                 kpts_[..., 0] += x
@@ -821,15 +840,15 @@ def plot_images(
                     if labels or conf[j] > conf_thres:
                         color = colors(classes[j])
                         mh, mw = image_masks[j].shape
-                        if mh != h or mw != w:
+                        if mh != height or mw != width:
                             mask = image_masks[j].astype(np.uint8)
-                            mask = cv2.resize(mask, (w, h))
+                            mask = cv2.resize(mask, (width, height))
                             mask = mask.astype(bool)
                         else:
                             mask = image_masks[j].astype(bool)
                         with contextlib.suppress(Exception):
-                            im[y : y + h, x : x + w, :][mask] = (
-                                im[y : y + h, x : x + w, :][mask] * 0.4 + np.array(color) * 0.6
+                            im[y : y + height, x : x + width, :][mask] = (
+                                im[y : y + height, x : x + width, :][mask] * 0.4 + np.array(color) * 0.6
                             )
                 annotator.fromarray(im)
     if not save:
@@ -994,7 +1013,7 @@ def plot_tune_results(csv_file="tune_results.csv"):
 
 
 def output_to_target(output, max_det=300):
-    """Convert model output to target format [batch_id, class_id, x, y, w, h, conf] for plotting."""
+    """Convert model output to target format [batch_id, class_id, x, y, width, height, conf] for plotting."""
     targets = []
     for i, o in enumerate(output):
         box, conf, cls = o[:max_det, :6].cpu().split((4, 1, 1), 1)
@@ -1005,7 +1024,7 @@ def output_to_target(output, max_det=300):
 
 
 def output_to_rotated_target(output, max_det=300):
-    """Convert model output to target format [batch_id, class_id, x, y, w, h, conf] for plotting."""
+    """Convert model output to target format [batch_id, class_id, x, y, width, height, conf] for plotting."""
     targets = []
     for i, o in enumerate(output):
         box, conf, cls, angle = o[:max_det].cpu().split((4, 1, 1, 1), 1)
@@ -1048,3 +1067,17 @@ def visual_feature_map(feature_map, module_type, mdule_index, max_num_plots=32, 
         np.save(str(filename.with_suffix(".npy")), feature_map[0].cpu().numpy())  # npy save
 
 
+
+def load_and_use_parameters(pt_file, target_function):
+    # 加载.pt文件中的参数
+    params = torch.load(pt_file)
+
+    # 调用目标函数，并将参数传递给它
+    target_function(**params)
+
+
+
+# 使用.pt文件中的参数
+if __name__ == '__main__':
+    pt_file_path = "/home/gcsx/ANG/ultralytics-24-03-27/debug_param/plot_images.pt"
+    load_and_use_parameters(pt_file_path, plot_images)
