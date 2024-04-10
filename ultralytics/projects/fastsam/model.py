@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from ultralytics.engine.engine_project import Engine_Project
+from ultralytics.engine.engine_project import Project_Engine
 from .predict import FastSAMPredictor
 from .val import FastSAMValidator
 
 
-class FastSAM(Engine_Project):
+class FastSAM(Project_Engine):
     """
     FastSAM model interface.
 

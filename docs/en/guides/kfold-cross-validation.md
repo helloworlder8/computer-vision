@@ -82,8 +82,8 @@ Without further ado, let's dive in!
 3. Now, read the contents of the dataset YAML file and extract the indices of the class labels.
 
     ```python
-    yaml_file = 'path/to/data.yaml'  # your data YAML with data directories and names dictionary
-    with open(yaml_file, 'r', encoding="utf8") as y:
+    data_str = 'path/to/data.yaml'  # your data YAML with data directories and names dictionary
+    with open(data_str, 'r', encoding="utf8") as y:
         classes = yaml.safe_load(y)['names']
     cls_idx = sorted(classes.keys())
     ```

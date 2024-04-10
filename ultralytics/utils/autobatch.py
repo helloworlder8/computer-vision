@@ -24,7 +24,7 @@ def check_train_batch_size(model, imgsz=640, amp=True):
     """
 
     with torch.cuda.amp.autocast(amp):
-        return autobatch(deepcopy(model).prepare_train(), imgsz)  # compute optimal batch size
+        return autobatch(deepcopy(model).DDP_or_normally_train(), imgsz)  # compute optimal batch size
 
 
 def autobatch(model, imgsz=640, fraction=0.60, batch_size=DEFAULT_PARAM.batch):

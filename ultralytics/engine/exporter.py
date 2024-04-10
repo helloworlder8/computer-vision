@@ -64,11 +64,11 @@ import numpy as np
 import torch
 
 from ultralytics.cfg_yaml import creat_args
-from ultralytics.data.dataset import YOLO_Dataset
-from ultralytics.data.utils import check_dataset
+from ultralytics.data.special_dataset import YOLO_Dataset
+from ultralytics.data.verify import check_detect_dataset
 from ultralytics.nn.autobackend import check_class_names, default_class_names
-from ultralytics.nn.common import C2f, Detect, RTDETRDecoder
-from ultralytics.nn.tasks_model import Detection_Model, SegmentationModel, WorldModel
+from ultralytics.nn.modules import C2f, Detect, RTDETRDecoder
+from ultralytics.nn.tasks import Detection_Model, SegmentationModel, WorldModel
 from ultralytics.utils import (
     ARM64,
     DEFAULT_PARAM,
@@ -212,7 +212,7 @@ class Exporter:
         # Input
         im = torch.zeros(self.args.batch, 3, *self.imgsz).to(self.device)
         file = Path(
-            getattr(model, "pt_path", None) or getattr(model, "yaml_file", None) or model.yaml.get("yaml_file", "")
+            getattr(model, "pt_path", None) or getattr(model, "data_str", None) or model.yaml.get("data_str", "")
         )
         if file.suffix in {".yaml", ".yml"}:
             file = Path(file.name)
@@ -253,7 +253,7 @@ class Exporter:
             if isinstance(y, torch.Tensor)
             else tuple(tuple(x.shape if isinstance(x, torch.Tensor) else []) for x in y)
         )
-        self.pretty_name = Path(self.model.yaml.get("yaml_file", self.file)).stem.replace("yolo", "YOLO")
+        self.pretty_name = Path(self.model.yaml.get("data_str", self.file)).stem.replace("yolo", "YOLO")
         data = model.args["data"] if hasattr(model, "args") and isinstance(model.args, dict) else ""
         description = f'Ultralytics {self.pretty_name} model {f"trained on {data}" if data else ""}'
         self.metadata = {
@@ -458,7 +458,7 @@ class Exporter:
 
             # Generate calibration data for integer quantization
             LOGGER.info(f"{prefix} collecting INT8 calibration images from 'data={self.args.data}'")
-            data = check_dataset(self.args.data)
+            data = check_detect_dataset(self.args.data)
             dataset = YOLO_Dataset(data["val"], data=data, imgsz=self.imgsz[0], augment=False)
             n = len(dataset)
             if n < 300:

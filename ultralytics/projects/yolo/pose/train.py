@@ -3,7 +3,7 @@
 from copy import copy
 
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks_model import PoseModel,creat_model_dict_add
+from ultralytics.nn.tasks import PoseModel,creat_model_dict_add
 from ultralytics.utils import DEFAULT_PARAM, LOGGER
 from ultralytics.utils.plotting import plot_images, plot_results
 
@@ -18,7 +18,7 @@ class PoseTrainer(yolo.detect.Detection_Trainer):
 
         args = dict(model='yolov8n-pose.pt', data='coco8-pose.yaml', epochs=3)
         trainer = PoseTrainer(overrides=args)
-        trainer.prepare_train()
+        trainer.DDP_or_normally_train()
         ```
     """
 
@@ -35,7 +35,7 @@ class PoseTrainer(yolo.detect.Detection_Trainer):
                 "See https://github.com/ultralytics/ultralytics/issues/4031."
             )
 
-    def get_model(self, model_str=None, model=None, verbose=True):
+    def build_model(self, model_str=None, model=None, verbose=True):
         """Get pose estimation model with specified configuration and weights."""
         model_dict = creat_model_dict_add(model_str)
         pose_model = PoseModel(model_dict, ch=self.data_dict["ch"], nc=self.data_dict["nc"], data_kpt_shape=self.data["kpt_shape"], verbose=verbose)
@@ -53,7 +53,7 @@ class PoseTrainer(yolo.detect.Detection_Trainer):
         """Returns an instance of the PoseValidator class for validation."""
         self.loss_names = "box_loss", "pose_loss", "kobj_loss", "cls_loss", "dfl_loss"
         return yolo.pose.PoseValidator(
-            self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
+            self.test_dataloader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
 
     def plot_training_samples(self, batch, ni):
@@ -75,6 +75,6 @@ class PoseTrainer(yolo.detect.Detection_Trainer):
             on_plot=self.on_plot,
         )
 
-    def plot_metrics(self):
+    def plot_result_metrics(self):
         """Plots training/val metrics."""
         plot_results(file=self.csv, pose=True, on_plot=self.on_plot)  # save results.png

@@ -16,13 +16,13 @@ Key Features:
 
 from pathlib import Path
 
-from ultralytics.engine.engine_project import Engine_Project
+from ultralytics.engine.engine_project import Project_Engine
 from ultralytics.utils.torch_utils import model_info
 from .build import build_sam
 from .predict import Predictor
 
 
-class SAM(Engine_Project):
+class SAM(Project_Engine):
     """
     SAM (Segment Anything Model) interface class.
 
@@ -45,7 +45,7 @@ class SAM(Engine_Project):
             raise NotImplementedError("SAM prediction requires pre-trained *.pt or *.pth model.")
         super().__init__(model=model, task_name="segment")
 
-    def _load_project(self, weights: str, task_name=None):
+    def _loadProject(self, weights: str, task_name=None):
         """
         Loads the specified weights into the SAM model.
 

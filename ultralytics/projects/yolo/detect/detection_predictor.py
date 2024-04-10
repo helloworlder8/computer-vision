@@ -1,7 +1,7 @@
 # Ultralytics YOLO 🚀, AGPL-3.0 license
 
 from ultralytics.engine.engine_predictor import Engine_Predictor
-from ultralytics.engine.results import Results
+from ultralytics.utils.results import Results
 from ultralytics.utils import ops
 
 

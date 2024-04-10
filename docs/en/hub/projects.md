@@ -25,33 +25,33 @@ This creates a unified and organized workspace that facilitates easier model man
 
 Navigate to the [Projects](https://hub.ultralytics.com/projects) page by clicking on the **Projects** button in the sidebar.
 
-![Ultralytics HUB screenshot of the Home page with an arrow pointing to the Projects button in the sidebar](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_create_project_1.jpg)
+![Ultralytics HUB screenshot of the Home page with an arrow pointing to the Projects button in the sidebar](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_createProject_1.jpg)
 
 ??? tip "Tip"
 
     You can also create a project directly from the [Home](https://hub.ultralytics.com/home) page.
 
-    ![Ultralytics HUB screenshot of the Home page with an arrow pointing to the Create Project card](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_create_project_2.jpg)
+    ![Ultralytics HUB screenshot of the Home page with an arrow pointing to the Create Project card](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_createProject_2.jpg)
 
 Click on the **Create Project** button on the top right of the page. This action will trigger the **Create Project** dialog, opening up a suite of options for tailoring your project to your needs.
 
-![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Create Project button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_create_project_3.jpg)
+![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Create Project button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_createProject_3.jpg)
 
-Type the name of your project in the _Project name_ field or keep the default name and finalize the project creation with a single click.
+Type the name of your project in the Project name_ field or keep the default name and finalize the project creation with a single click.
 
 You have the additional option to enrich your project with a description and a unique image, enhancing its recognizability on the Projects page.
 
 When you're happy with your project configuration, click **Create**.
 
-![Ultralytics HUB screenshot of the Create Project dialog with an arrow pointing to the Create button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_create_project_4.jpg)
+![Ultralytics HUB screenshot of the Create Project dialog with an arrow pointing to the Create button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_createProject_4.jpg)
 
 After your project is created, you will be able to access it from the Projects page.
 
-![Ultralytics HUB screenshot of the Projects page with an arrow pointing to one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_create_project_5.jpg)
+![Ultralytics HUB screenshot of the Projects page with an arrow pointing to one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_createProject_5.jpg)
 
 Next, [train a model](https://docs.ultralytics.com/hub/models/#train-model) inside your project.
 
-![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Train Model button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_create_project_6.jpg)
+![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Train Model button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_createProject_6.jpg)
 
 ## Share Project
 
@@ -67,17 +67,17 @@ Next, [train a model](https://docs.ultralytics.com/hub/models/#train-model) insi
 
 Navigate to the Project page of the project you want to share, open the project actions dropdown and click on the **Share** option. This action will trigger the **Share Project** dialog.
 
-![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Share option](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_share_project_1.jpg)
+![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Share option](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_shareProject_1.jpg)
 
 ??? tip "Tip"
 
     You can also share a project directly from the [Projects](https://hub.ultralytics.com/projects) page.
 
-    ![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Share option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_share_project_2.jpg)
+    ![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Share option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_shareProject_2.jpg)
 
 Set the general access to "Unlisted" and click **Save**.
 
-![Ultralytics HUB screenshot of the Share Project dialog with an arrow pointing to the dropdown and one to the Save button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_share_project_3.jpg)
+![Ultralytics HUB screenshot of the Share Project dialog with an arrow pointing to the dropdown and one to the Save button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_shareProject_3.jpg)
 
 !!! Warning "Warning"
 
@@ -89,35 +89,35 @@ Now, anyone who has the direct link to your project can view it.
 
     You can easily click on the project's link shown in the **Share Project** dialog to copy it.
 
-    ![Ultralytics HUB screenshot of the Share Project dialog with an arrow pointing to the project's link](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_share_project_4.jpg)
+    ![Ultralytics HUB screenshot of the Share Project dialog with an arrow pointing to the project's link](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_shareProject_4.jpg)
 
 ## Edit Project
 
 Navigate to the Project page of the project you want to edit, open the project actions dropdown and click on the **Edit** option. This action will trigger the **Update Project** dialog.
 
-![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Edit option](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_edit_project_1.jpg)
+![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Edit option](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_editProject_1.jpg)
 
 ??? tip "Tip"
 
     You can also edit a project directly from the [Projects](https://hub.ultralytics.com/projects) page.
 
-    ![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Edit option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_edit_project_2.jpg)
+    ![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Edit option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_editProject_2.jpg)
 
 Apply the desired modifications to your project and then confirm the changes by clicking **Save**.
 
-![Ultralytics HUB screenshot of the Update Project dialog with an arrow pointing to the Save button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_edit_project_3.jpg)
+![Ultralytics HUB screenshot of the Update Project dialog with an arrow pointing to the Save button](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_editProject_3.jpg)
 
 ## Delete Project
 
 Navigate to the Project page of the project you want to delete, open the project actions dropdown and click on the **Delete** option. This action will delete the project.
 
-![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Delete option](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_delete_project_1.jpg)
+![Ultralytics HUB screenshot of the Project page with an arrow pointing to the Delete option](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_deleteProject_1.jpg)
 
 ??? tip "Tip"
 
     You can also delete a project directly from the [Projects](https://hub.ultralytics.com/projects) page.
 
-    ![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Delete option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_delete_project_2.jpg)
+    ![Ultralytics HUB screenshot of the Projects page with an arrow pointing to the Delete option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_deleteProject_2.jpg)
 
 !!! Warning "Warning"
 
@@ -127,7 +127,7 @@ Navigate to the Project page of the project you want to delete, open the project
 
     If you change your mind, you can restore the project from the [Trash](https://hub.ultralytics.com/trash) page.
 
-    ![Ultralytics HUB screenshot of the Trash page with an arrow pointing to the Restore option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_delete_project_3.jpg)
+    ![Ultralytics HUB screenshot of the Trash page with an arrow pointing to the Restore option of one of the projects](https://raw.githubusercontent.com/ultralytics/assets/main/docs/hub/projects/hub_deleteProject_3.jpg)
 
 ## Compare Models
 

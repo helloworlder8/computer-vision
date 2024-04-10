@@ -2,15 +2,15 @@
 
 from pathlib import Path
 
-from ultralytics.engine.engine_project import Engine_Project
+from ultralytics.engine.engine_project import Project_Engine
 from ultralytics.projects import yolo
-from ultralytics.nn.tasks_model import ClassificationModel, Detection_Model, OBBModel, PoseModel, SegmentationModel, WorldModel
+from ultralytics.nn.tasks import ClassificationModel, Detection_Model, OBBModel, PoseModel, SegmentationModel, WorldModel
 from ultralytics.utils import yaml_load, ROOT
 
 
 
 
-class YOLO_PROJECT(Engine_Project): #项目 为了外部不大改不使用YOLO_PROJECT
+class YOLOProject(Project_Engine): #项目 为了外部不大改不使用YOLOProject
 
 
     def __init__(self, model_str="yolov8n.pt", task_name=None, verbose=False): #yaml pt
@@ -59,9 +59,9 @@ class YOLO_PROJECT(Engine_Project): #项目 为了外部不大改不使用YOLO_P
             },
         }
     
-YOLO = YOLO_PROJECT
+YOLO = YOLOProject
 
-class YOLOWorld(Engine_Project):
+class YOLOWorld(Project_Engine):
     """YOLO-World object detection model."""
 
     def __init__(self, model="yolov8s-world.pt") -> None:

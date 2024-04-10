@@ -36,6 +36,10 @@ FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLO
 ASSETS = ROOT / "assets"  # default images
 DEFAULT_CFG_PATH = ROOT / "cfg_yaml/default.yaml"
+# DEFAULT_CFG_PATH = ROOT / "cfg_yaml/resume.yaml"
+
+
+
 NUM_THREADS = min(8, max(1, os.cpu_count() - 1))  # number of YOLOv5 multiprocessing threads
 AUTOINSTALL = str(os.getenv("YOLO_AUTOINSTALL", True)).lower() == "true"  # global auto-install mode
 VERBOSE = str(os.getenv("YOLO_VERBOSE", True)).lower() == "true"  # global verbose mode
@@ -177,9 +181,8 @@ class IterableSimpleNamespace(SimpleNamespace):
         raise AttributeError(
             f"""
             '{name}' object has no attribute '{attr}'. This may be caused by a modified or out of date ultralytics
-            'default.yaml' file.\nPlease update your code with 'pip install -U ultralytics' and if necessary replace
+            'default.yaml' file.\n
             {DEFAULT_CFG_PATH} with the latest version from
-            https://github.com/ultralytics/ultralytics/blob/main/ultralytics/cfg/default.yaml
             """
         )
 
@@ -349,10 +352,10 @@ def yaml_save(file="data.yaml", data=None, header=""):
         yaml.safe_dump(data, f, sort_keys=False, allow_unicode=True)
 
 
-def yaml_load(yaml_file="data.yaml", append_yaml_filename=False):
+def yaml_load(data_str="data.yaml", append_yaml_filename=False):
 
-    assert Path(yaml_file).suffix in (".yaml", ".yml"), f"Attempting to load non-YAML yaml_file {yaml_file} with yaml_load()"
-    with open(yaml_file, errors="ignore", encoding="utf-8") as f:
+    assert Path(data_str).suffix in (".yaml", ".yml"), f"Attempting to load non-YAML data_str {data_str} with yaml_load()"
+    with open(data_str, errors="ignore", encoding="utf-8") as f:
         s = f.read()  # string
 
         if not s.isprintable():
@@ -360,23 +363,23 @@ def yaml_load(yaml_file="data.yaml", append_yaml_filename=False):
             #这里面的不替换
         yaml_dict = yaml.safe_load(s) or {}
         if append_yaml_filename:
-            yaml_dict["yaml_file"] = str(yaml_file)
+            yaml_dict["data_str"] = str(data_str)
         return yaml_dict
 
 
-def yaml_print(yaml_file: Union[str, Path, dict]) -> None:
+def yaml_print(data_str: Union[str, Path, dict]) -> None:
     """
     Pretty prints a YAML file or a YAML-formatted dictionary.
 
     Args:
-        yaml_file: The file path of the YAML file or a YAML-formatted dictionary.
+        data_str: The file path of the YAML file or a YAML-formatted dictionary.
 
     Returns:
         (None)
     """
-    yaml_dict = yaml_load(yaml_file) if isinstance(yaml_file, (str, Path)) else yaml_file
+    yaml_dict = yaml_load(data_str) if isinstance(data_str, (str, Path)) else data_str
     dump = yaml.dump(yaml_dict, sort_keys=False, allow_unicode=True)
-    LOGGER.info(f"Printing '{colorstr('bold', 'black', yaml_file)}'\n\n{dump}")
+    LOGGER.info(f"Printing '{colorstr('bold', 'black', data_str)}'\n\n{dump}")
 
 
 # Default configuration
@@ -619,7 +622,7 @@ def get_user_config_dir(sub_dir="Ultralytics"):
         path = Path.home() / "Library" / "Application Support" / sub_dir
     elif LINUX:
         # path = Path.home() / ".config" / sub_dir
-        relative_path = "run"
+        relative_path = "ultralytics/assets"
         path = Path(os.path.abspath(relative_path))
     else:
         raise ValueError(f"Unsupported operating system: {platform.system()}")

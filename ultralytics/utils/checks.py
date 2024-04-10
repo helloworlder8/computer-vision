@@ -286,15 +286,7 @@ def check_pip_update_available():
 
 @ThreadingLocked()
 def check_font(font="Arial.ttf"):
-    """
-    Find font locally or download to user's configuration directory if it does not already exist.
 
-    Args:
-        font (str): Path or name of font.
-
-    Returns:
-        file (Path): Resolved font file path.
-    """
     name = Path(font).name
 
     # Check USER_CONFIG_DIR

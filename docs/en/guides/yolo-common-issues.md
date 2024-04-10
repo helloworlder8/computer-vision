@@ -62,10 +62,10 @@ This section will address common issues faced while training and their respectiv
 
 **Issue**: You are unsure whether the configuration settings in the `.yaml` file are being applied correctly during model training.
 
-**Solution**: The configuration settings in the `.yaml` file should be applied when using the `model.prepare_train()` function. To ensure that these settings are correctly applied, follow these steps:
+**Solution**: The configuration settings in the `.yaml` file should be applied when using the `model.DDP_or_normally_train()` function. To ensure that these settings are correctly applied, follow these steps:
 
 - Confirm that the path to your `.yaml` configuration file is correct.
-- Make sure you pass the path to your `.yaml` file as the `data` argument when calling `model.prepare_train()`, as shown below:
+- Make sure you pass the path to your `.yaml` file as the `data` argument when calling `model.DDP_or_normally_train()`, as shown below:
 
 ```python
 model.train(data='/path/to/your/data.yaml', batch=4)
