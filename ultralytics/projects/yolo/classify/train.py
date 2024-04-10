@@ -25,7 +25,7 @@ class ClassificationTrainer(Engine_Trainer):
 
         args = dict(model='yolov8n-cls.pt', data='imagenet10', epochs=3)
         trainer = ClassificationTrainer(overrides=args)
-        trainer.prepare_train()
+        trainer.DDP_or_normally_train()
         ```
     """
 
@@ -42,7 +42,7 @@ class ClassificationTrainer(Engine_Trainer):
         """Set the YOLO model's class names from the loaded dataset."""
         self.model.names = self.data["names"]
 
-    def get_model(self, model_str=None, model=None, verbose=True):
+    def build_model(self, model_str=None, model=None, verbose=True):
         """Returns a modified PyTorch model configured for training YOLO."""
         model_dict = creat_model_dict_add(model_str)
 
@@ -59,7 +59,7 @@ class ClassificationTrainer(Engine_Trainer):
             p.requires_grad = True  # for training
         return model
 
-    def setup_model(self):
+    def _setup_model(self):
         """Load, create or download model for any task_name."""
         if isinstance(self.model, torch.nn.Module):  # if model is loaded beforehand. No setup needed
             return
@@ -71,7 +71,7 @@ class ClassificationTrainer(Engine_Trainer):
             for p in self.model.parameters():
                 p.requires_grad = True  # for training
         elif model.split(".")[-1] in ("yaml", "yml"):
-            self.model = self.get_model(model_str=model)
+            self.model = self.build_model(model_str=model)
         elif model in torchvision.models.__dict__:
             self.model = torchvision.models.__dict__[model](weights="IMAGENET1K_V1" if self.args.pretrained else None)
         else:
@@ -117,7 +117,7 @@ class ClassificationTrainer(Engine_Trainer):
     def get_validator(self):
         """Returns an instance of ClassificationValidator for validation."""
         self.loss_names = ["loss"]
-        return yolo.classify.ClassificationValidator(self.test_loader, self.save_dir, _callbacks=self.callbacks)
+        return yolo.classify.ClassificationValidator(self.test_dataloader, self.save_dir, _callbacks=self.callbacks)
 
     def label_loss_items(self, loss_items=None, prefix="train"):
         """
@@ -131,7 +131,7 @@ class ClassificationTrainer(Engine_Trainer):
         loss_items = [round(float(loss_items), 5)]
         return dict(zip(keys, loss_items))
 
-    def plot_metrics(self):
+    def plot_result_metrics(self):
         """Plots metrics from a CSV file."""
         plot_results(file=self.csv, classify=True, on_plot=self.on_plot)  # save results.png
 

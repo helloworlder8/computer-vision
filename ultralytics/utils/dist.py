@@ -37,7 +37,7 @@ if __name__ == "__main__":
     default_param = DEFAULT_PARAM_DICT.copy()
     default_param.update(save_dir='')   # handle the extra key 'save_dir'
     trainer = {name}(default_param=default_param, overrides=overrides)
-    results = trainer.prepare_train()
+    results = trainer.DDP_or_normally_train()
 """
     (USER_CONFIG_DIR / "DDP").mkdir(exist_ok=True)
     with tempfile.NamedTemporaryFile(

@@ -18,7 +18,7 @@ class SegmentationTrainer(yolo.detect.Detection_Trainer):
 
         args = dict(model='yolov8n-seg.pt', data='coco8-seg.yaml', epochs=3)
         trainer = SegmentationTrainer(overrides=args)
-        trainer.prepare_train()
+        trainer.DDP_or_normally_train()
         ```
     """
 
@@ -29,7 +29,7 @@ class SegmentationTrainer(yolo.detect.Detection_Trainer):
         overrides["task_name"] = "segment"
         super().__init__(cfg, overrides, _callbacks)
 
-    def get_model(self, model_str=None, model=None, verbose=True):
+    def build_model(self, model_str=None, model=None, verbose=True):
         """Return SegmentationModel initialized with specified config and weights."""
         model_dict = creat_model_dict_add(model_str)
         model = SegmentationModel(model_dict, ch=self.data_dict["ch"], nc=self.data_dict["nc"], verbose=verbose and RANK == -1)
@@ -42,7 +42,7 @@ class SegmentationTrainer(yolo.detect.Detection_Trainer):
         """Return an instance of SegmentationValidator for validation of YOLO model."""
         self.loss_names = "box_loss", "seg_loss", "cls_loss", "dfl_loss"
         return yolo.segment.SegmentationValidator(
-            self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
+            self.test_dataloader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
 
     def plot_training_samples(self, batch, ni):
@@ -58,6 +58,6 @@ class SegmentationTrainer(yolo.detect.Detection_Trainer):
             on_plot=self.on_plot,
         )
 
-    def plot_metrics(self):
+    def plot_result_metrics(self):
         """Plots training/val metrics."""
         plot_results(file=self.csv, segment=True, on_plot=self.on_plot)  # save results.png

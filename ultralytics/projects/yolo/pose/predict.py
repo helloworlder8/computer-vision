@@ -1,6 +1,6 @@
 # Ultralytics YOLO 🚀, AGPL-3.0 license
 
-from ultralytics.engine.results import Results
+from ultralytics.utils.results import Results
 from ultralytics.projects.yolo.detect.detection_predictor import Detection_Predictor
 from ultralytics.utils import DEFAULT_PARAM, LOGGER, ops
 

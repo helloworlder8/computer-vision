@@ -7,52 +7,14 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from ultralytics.nn.common import (
-    AIFI,
-    C1,
-    C2,
-    C3,
-    C3TR,
-    OBB,
-    SPP,
-    SPPF,
-    Bottleneck,
-    BottleneckCSP,
-    C2f,
-    C2fAttn,
-    ImagePoolingAttn,
-    C3Ghost,
-    C3x,
-    Classify,
-    Concat,
-    Conv,
-    Conv2,
-    ConvTranspose,
-    Detect,
-    DWConv,
-    DWConvTranspose2d,
-    Focus,
-    GhostBottleneck,
-    GhostConv,
-    HGBlock,
-    HGStem,
-    Pose,
-    RepC3,
-    RepConv,
-    ResNetLayer,
-    RTDETRDecoder,
-    Segment,
-    WorldDetect,
-    RepNCSPELAN4,
-    ADown,
-    SPPELAN,
-    CBFuse,
-    CBLinear,
-    Silence,
-)
+from ultralytics.nn.modules import *
+from ultralytics.nn.my_modules import *
+# from ultralytics.nn.extra_modules import *
+
+
 from ultralytics.utils import DEFAULT_PARAM_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
-from ultralytics.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8OBBLoss, v8PoseLoss, v8SegmentationLoss
+from ultralytics.utils.loss import v8ClassificationLoss, Anchor_Free_Detection_Loss, v8OBBLoss, v8PoseLoss, v8SegmentationLoss
 from ultralytics.utils.plotting import visual_feature_map
 from ultralytics.utils.torch_utils import (
     fuse_conv_and_bn,
@@ -69,17 +31,45 @@ try:
     import thop
 except ImportError:
     thop = None
-
+from timm import create_model
 
 class Base_Model(nn.Module):
-    """The Base_Model class serves as a base class for all the models in the Ultralytics YOLO family."""
+    """图片直接预测，字典计算损失值."""
 
     def forward(self, batch_labels_list, *args, **kwargs): #成3了
 
         if isinstance(batch_labels_list, dict):  
-            return self.loss(batch_labels_list, *args, **kwargs) 
-        return self.predict(batch_labels_list, *args, **kwargs)  
+            return self.computer_loss(batch_labels_list, *args, **kwargs) 
+        return self.predict(batch_labels_list, *args, **kwargs)  #图片数据直接预测
 
+    def computer_loss(self, batch_labels_list, preds=None):
+
+        if not hasattr(self, "criterion"):
+            self.loss_class = self.build_loss_class()
+
+        preds = self.forward(batch_labels_list["img"]) if preds is None else preds #torch.Size([16, 144, 80, 80]) torch.Size([16, 144, 40, 40]) torch.Size([16, 144, 20, 20])
+        return self.loss_class(preds, batch_labels_list)
+
+    # def forward(self, batch_labels_list, *args, preds=None, **kwargs):
+
+    #     if isinstance(batch_labels_list, dict):
+
+    #         if preds is None:
+
+    #             if not hasattr(self, "criterion"):
+    #                 self.loss_class = self.build_loss_class()
+
+    #             preds = self.predict(batch_labels_list["img"], *args, **kwargs)
+    #         # 计算损失
+    #         return self.loss_class(preds, batch_labels_list) #字典主出口
+
+    #     # 如果输入不是字典，直接进行预测
+    #     return self.predict(batch_labels_list, *args, **kwargs)
+
+    def build_loss_class(self):
+        """Initialize the loss criterion for the Base_Model."""
+        raise NotImplementedError("compute_loss() needs to be implemented by task_name heads")
+    
     def predict(self, x, profile=False, visual_save_path=False, augment=False, embed=None):
 
         if augment:
@@ -95,7 +85,13 @@ class Base_Model(nn.Module):
             if profile:
                 self._profile_one_layer(m, x, dt)
             x = m(x)  # run
-            y.append(x if m.i in self.save else None)  # save output
+            # if isinstance(x, list):
+            #     for detect in x:
+            #         print("detect: {}".format(detect.size()))
+            # else:
+            #     print(x.size())
+
+            y.append(x if m.i in self.save else None)  # 保留这一层输出
             if visual_save_path:
                 visual_feature_map(x, m.type, m.i, save_path=visual_save_path)
             if embed and m.i in embed:
@@ -189,6 +185,8 @@ class Base_Model(nn.Module):
         """
         self = super()._apply(fn)
         m = self.seqential_model[-1]  # Detect()
+        # if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, 
+        #                   Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment, Segment_Efficient,GhostConvDetect)):
         if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
@@ -210,23 +208,7 @@ class Base_Model(nn.Module):
         if verbose:
             LOGGER.info(f"Transferred {len(csd)}/{len(self.seqential_model.state_dict())} items from pretrained weights")
 
-    def loss(self, batch_labels_list, preds=None):
-        """
-        Compute loss.
 
-        Args:
-            batch (dict): Batch to compute loss on
-            preds (torch.Tensor | List[torch.Tensor]): Predictions.
-        """
-        if not hasattr(self, "criterion"):
-            self.criterion = self.init_criterion()
-
-        preds = self.forward(batch_labels_list["img"]) if preds is None else preds #torch.Size([16, 144, 80, 80]) torch.Size([16, 144, 40, 40]) torch.Size([16, 144, 20, 20])
-        return self.criterion(preds, batch_labels_list)
-
-    def init_criterion(self):
-        """Initialize the loss criterion for the Base_Model."""
-        raise NotImplementedError("compute_loss() needs to be implemented by task_name heads")
 
 
 
@@ -257,11 +239,13 @@ class Detection_Model(Base_Model): #检测模型
             self.model_dict["nc"] = nc #通道安装输入 类别按照输入但是model——dict可以自带
 
         # 创建模型并保存器
-        self.seqential_model, self.save = sequential_model(deepcopy(self.model_dict), ch=ch, verbose=verbose)
+        self.seqential_model, self.save = parse_model(deepcopy(self.model_dict), ch=ch, verbose=verbose)
 
         # 构建步长
         last_layer_model = self.seqential_model[-1]
-        if isinstance(last_layer_model, Detect):
+        if isinstance(last_layer_model, Detect):        
+        # if isinstance(last_layer_model, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, 
+        #                   Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment, Segment_Efficient, Pose,GhostConvDetect)):
             s = 256
             last_layer_model.inplace = self.model_dict.get("inplace", True)
             # forward = lambda x: self.forward(x)[0] if isinstance(last_layer_model, (Segment, Pose, OBB)) else self.forward(x,visual_save_path=Path("improved"))
@@ -311,9 +295,9 @@ class Detection_Model(Base_Model): #检测模型
         y[-1] = y[-1][..., i:]  # small
         return y
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the Detection_Model."""
-        return v8DetectionLoss(self)
+        return Anchor_Free_Detection_Loss(self)
 
 
 class OBBModel(Detection_Model):
@@ -323,7 +307,7 @@ class OBBModel(Detection_Model):
         """Initialize YOLOv8 OBB model with given config and parameters."""
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the model."""
         return v8OBBLoss(self)
 
@@ -335,7 +319,7 @@ class SegmentationModel(Detection_Model):
         """Initialize YOLOv8 segmentation model with given config and parameters."""
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the SegmentationModel."""
         return v8SegmentationLoss(self)
 
@@ -352,7 +336,7 @@ class PoseModel(Detection_Model):
             cfg["kpt_shape"] = data_kpt_shape
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the PoseModel."""
         return v8PoseLoss(self)
 
@@ -376,7 +360,7 @@ class ClassificationModel(Base_Model):
             self.model_dict["nc"] = nc  # override YAML value
         elif not nc and not self.model_dict.get("nc", None):
             raise ValueError("nc not specified. Must specify nc in model.yaml or function arguments.")
-        self.seqential_model, self.save = sequential_model(deepcopy(self.model_dict), ch=ch, verbose=verbose)  # model, savelist
+        self.seqential_model, self.save = parse_model(deepcopy(self.model_dict), ch=ch, verbose=verbose)  # model, savelist
         self.stride = torch.Tensor([1])  # no stride constraints
         self.names = {i: f"{i}" for i in range(self.model_dict["nc"])}  # default names dict
         self.info()
@@ -402,7 +386,7 @@ class ClassificationModel(Base_Model):
                 if m[i].out_channels != nc:
                     m[i] = nn.Conv2d(m[i].in_channels, nc, m[i].kernel_size, m[i].stride, bias=m[i].bias is not None)
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the ClassificationModel."""
         return v8ClassificationLoss()
 
@@ -422,7 +406,7 @@ class RTDETRDetectionModel(Detection_Model):
         verbose (bool): Specifies if summary statistics are shown during initialization. Default is True.
 
     Methods:
-        init_criterion: Initializes the criterion used for loss calculation.
+        build_loss_class: Initializes the criterion used for loss calculation.
         loss: Computes and returns the loss during training.
         predict: Performs a forward pass through the network and returns the output.
     """
@@ -439,7 +423,7 @@ class RTDETRDetectionModel(Detection_Model):
         """
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the RTDETRDetectionModel."""
         from ultralytics.projects.utils.loss import RTDETRDetectionLoss
 
@@ -457,7 +441,7 @@ class RTDETRDetectionModel(Detection_Model):
             (tuple): A tuple containing the total loss and main three losses in a tensor.
         """
         if not hasattr(self, "criterion"):
-            self.criterion = self.init_criterion()
+            self.loss_class = self.build_loss_class()
 
         img = batch["img"]
         # NOTE: preprocess gt_bbox and gt_labels to list.
@@ -482,7 +466,7 @@ class RTDETRDetectionModel(Detection_Model):
         dec_bboxes = torch.cat([enc_bboxes.unsqueeze(0), dec_bboxes])  # (7, bs, 300, 4)
         dec_scores = torch.cat([enc_scores.unsqueeze(0), dec_scores])
 
-        loss = self.criterion(
+        loss = self.loss_class(
             (dec_bboxes, dec_scores), targets, dn_bboxes=dn_bboxes, dn_scores=dn_scores, dn_meta=dn_meta
         )
         # NOTE: There are like 12 losses in RTDETR, backward with all losses but only show the main three losses.
@@ -548,7 +532,7 @@ class WorldModel(Detection_Model):
         self.txt_feats = txt_feats.reshape(-1, len(text), txt_feats.shape[-1]).detach()
         self.seqential_model[-1].nc = len(text)
 
-    def init_criterion(self):
+    def build_loss_class(self):
         """Initialize the loss criterion for the model."""
         raise NotImplementedError
 
@@ -704,42 +688,62 @@ def generate_ckpt(model_pt):
 
 
 def attempt_load_weights(model_pts, device=None, inplace=True, fuse=False):
-    """Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a."""
+    """Loads models or an ensemble of models from weights."""
 
+    # Prepare an ensemble
     ensemble = Ensemble()
-    for model_pt in model_pts if isinstance(model_pts, list) else [model_pts]:
-        ckpt, model_pt = generate_ckpt(model_pt)  # load ckpt
-        args = {**DEFAULT_PARAM_DICT, **ckpt["train_args"]} if "train_args" in ckpt else None  # combined args
-        model = (ckpt.get("ema") or ckpt["model"]).to(device).float()  # FP32 model
 
-        # Model compatibility updates
-        model.args = args  # attach args to model
-        model.model_str = model_pt  # attach *.pt file path to model
-        model.task_name = creat_model_task_name(model)
+    # Ensure model_pts is a list
+    model_pts = model_pts if isinstance(model_pts, list) else [model_pts]
+
+    # Load each model
+    for model_pt in model_pts:
+        # Generate checkpoint
+        ckpt, model_pt = generate_ckpt(model_pt)
+
+        # Get training arguments
+        args = {**DEFAULT_PARAM_DICT, **ckpt["train_args"]} if "train_args" in ckpt else None
+
+        # Load model
+        model = (ckpt.get("ema") or ckpt["model"]).to(device).float()
+        model.args = args  # attach args
+        model.model_str = model_pt  # attach path
+        model.task_name = creat_model_task_name(model)  # attach task name
+
+        # Compatibility checks
         if not hasattr(model, "stride"):
             model.stride = torch.tensor([32.0])
 
-        # Append
-        ensemble.append(model.fuse().eval() if fuse and hasattr(model, "fuse") else model.eval())  # model in eval mode
+        # Append to ensemble
+        if fuse and hasattr(model, "fuse"):
+            ensemble.append(model.fuse().eval())  # Fuse and set to eval mode
+        else:
+            ensemble.append(model.eval())  # Set to eval mode
 
     # Module updates
     for m in ensemble.modules():
+        t = type(m)
         if hasattr(m, "inplace"):
             m.inplace = inplace
         elif isinstance(m, nn.Upsample) and not hasattr(m, "recompute_scale_factor"):
-            m.recompute_scale_factor = None  # torch 1.11.0 compatibility
+            m.recompute_scale_factor = None  # Compatibility for torch 1.11.0
 
-    # Return model
+    # If only one model is loaded, return the model
     if len(ensemble) == 1:
         return ensemble[-1]
 
-    # Return ensemble
-    LOGGER.info(f"Ensemble created with {weights}\n")
-    for k in "names", "nc", "yaml":
-        setattr(ensemble, k, getattr(ensemble[0], k))
+    # Otherwise, return an ensemble
+    # Set shared attributes for the ensemble
+    for attr in ["names", "nc", "yaml"]:
+        setattr(ensemble, attr, getattr(ensemble[0], attr))
     ensemble.stride = ensemble[int(torch.argmax(torch.tensor([m.stride.max() for m in ensemble])))].stride
+
+    # Ensure all models have the same class count
     assert all(ensemble[0].nc == m.nc for m in ensemble), f"Models differ in class counts {[m.nc for m in ensemble]}"
+
+    LOGGER.info(f"Ensemble created with models: {[m.model_str for m in ensemble]}")
     return ensemble
+
 
 
 def load_pytorch_model(model_pt, device=None, inplace=True, fuse=False): #'yolov8n.pt'
@@ -768,30 +772,30 @@ def load_pytorch_model(model_pt, device=None, inplace=True, fuse=False): #'yolov
     return model, ckpt
 
 
-def sequential_model(model_str, ch, verbose=True):  # model_dict, input_channels(3)
+def parse_model(model_dict, ch, verbose=True):  # model_dict, input_channels(3)  模型序列化
     """Parse a YOLO model.yaml dictionary into a PyTorch model."""
     import ast
 
     max_channels = float("inf")
-    depth, width, kpt_shape = (model_str.get(x, 1.0) for x in ("depth_multiple", "width_multiple", "kpt_shape")) #0.33 0.25 1.0
-    nc, act, scales = (model_str.get(x) for x in ("nc", "activation", "scales")) #80 none none  通道 激活 尺度
+    depth, width, kpt_shape = (model_dict.get(x, 1.0) for x in ("depth_multiple", "width_multiple", "kpt_shape")) #0.33 0.25 1.0
+    nc, act, scales = (model_dict.get(x) for x in ("nc", "activation", "scales")) #80 none none  通道 激活 尺度
 
     if scales:
-        scale = model_str.get("scale")
+        scale = model_dict.get("scale")
         if not scale:
             scale = tuple(scales.keys())[0]
             LOGGER.warning(f"警告 ⚠️ 没有传入模型具体尺度（包括模型深度（堆叠层数）和宽度（单层通道数目））. 猜测的尺度是'{scale}'.") #使用第一个尺度
         depth, width, max_channels = scales[scale] #尺度中给出了三个值 深度 宽度 最大通道数
     if act:
-        Conv.default_act = eval(act)  # redefine default activation, i.e. Conv.default_act = nn.SiLU()
+        Conv.default_act = eval(act)  #设置卷积的默认激活函数
         if verbose:
-            LOGGER.info(f"{colorstr('activation:')} {act}")  # print
-    if verbose:
+            LOGGER.info(f"{colorstr('activation:')} {act}")  # 打印激活函数
+    if verbose:  #打印模型信息
         LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
 
     ch = [ch]  #[3]
     model, save, c2 = [], [], []  # layers, savelist, ch out
-    for i, (f, n, m, args) in enumerate(model_str["backbone"] + model_str["head"]):  # from, number, module, args
+    for i, (f, n, m, args) in enumerate(model_dict["backbone"] + model_dict["head"]):  # from, number, module, args
         m = getattr(torch.nn, m[3:]) if "nn." in m else globals()[m]  # get module
         for j, a in enumerate(args):
             if isinstance(a, str):
@@ -799,34 +803,20 @@ def sequential_model(model_str, ch, verbose=True):  # model_dict, input_channels
                     args[j] = locals()[a] if a in locals() else ast.literal_eval(a)
         # 深层 宽通
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain   1
-        if m in (
-            Classify,
-            Conv,
-            ConvTranspose,
-            GhostConv,
-            Bottleneck,
-            GhostBottleneck,
-            SPP,
-            SPPF,
-            DWConv,
-            Focus,
-            BottleneckCSP,
-            C1,
-            C2,
-            C2f,
-            RepNCSPELAN4,
-            ADown,
-            SPPELAN,
-            C2fAttn,
-            C3,
-            C3TR,
-            C3Ghost,
-            nn.ConvTranspose2d,
-            DWConvTranspose2d,
-            C3x,
-            RepC3,
+        if m in (Classify,Conv,ConvTranspose,GhostConv,Bottleneck,GhostBottleneck,SPP,SPPF,DWConv,Focus,BottleneckCSP,C1,
+            C2,C2f,RepNCSPELAN4,ADown,SPPELAN,C2fAttn,C3,C3TR,C3Ghost,nn.ConvTranspose2d,DWConvTranspose2d,C3x,RepC3,
+
+
+            # 改进
+            GSConv, VoVGSCSP, VoVGSCSPC,
+            PConv,
+            ShuffleNetV2,
+            ShuffleNetV3,
+
         ):
-            c1, c2 = ch[f], args[0]
+            c1, c2 = ch[f], args[0] #给出输入 输出通道
+
+
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8) #输出通道的操作
 
@@ -837,9 +827,17 @@ def sequential_model(model_str, ch, verbose=True):  # model_dict, input_channels
                 )  # num heads
 
             args = [c1, c2, *args[1:]]
-            if m in (BottleneckCSP, C1, C2, C2f, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3):
+
+
+
+            if m in (BottleneckCSP, C1, C2, C2f, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3, VoVGSCSP, VoVGSCSPC,
+                                         ):
                 args.insert(2, n)  # 插入个数个数变成1   number of repeats
                 n = 1
+
+
+
+
         elif m is AIFI:
             args = [ch[f], *args]
         elif m in (HGStem, HGBlock):
@@ -854,8 +852,18 @@ def sequential_model(model_str, ch, verbose=True):  # model_dict, input_channels
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
+
+
+
         elif m in (Detect, WorldDetect, Segment, Pose, OBB, ImagePoolingAttn):
+        # elif m in (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, 
+        #            Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment, Segment_Efficient, Pose,GhostConvDetect):
+            # 添加输入通道
             args.append([ch[x] for x in f])
+
+
+
+
             if m is Segment:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
         elif m is RTDETRDecoder:  # special case, channels arg must be passed in index 1
@@ -866,6 +874,10 @@ def sequential_model(model_str, ch, verbose=True):  # model_dict, input_channels
             args = [c1, c2, *args[1:]]
         elif m is CBFuse:
             c2 = ch[f[-1]]
+
+        # 改进
+        elif m is space_to_depth:
+            c2 = 4 * ch[f]    
         else:
             c2 = ch[f]
 
@@ -890,7 +902,7 @@ def creat_model_dict_add(model_str):
     model_cfg2 = check_yaml(unified_path, hard=False) or check_yaml(model_str) #优先使用通用的
     model_dict = yaml_load(model_cfg2)  # model dict
     model_dict["scale"] = creat_model_scale(model_str) #n
-    model_dict["yaml_file"] = str(model_str)
+    model_dict["data_str"] = str(model_str)
     return model_dict
 
 
@@ -940,7 +952,10 @@ def creat_model_task_name(model): #class{detectionmodel} 只取了模型部分
                 return "pose"
             elif isinstance(m, OBB):
                 return "obb"
-            elif isinstance(m, (Detect, WorldDetect)):
+            # if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, 
+            #                   Detect_AFPN_P345, Detect_AFPN_P345_Custom, Detect_Efficient, DetectAux,
+            #                   Detect_DyHeadWithDCNV3,WorldDetect,GhostConvDetect,GhostConvDetect)):
+            elif isinstance(m, (Detect, WorldDetect)):            
                 return "detect"
 
     # Guess from model filename
@@ -963,3 +978,31 @@ def creat_model_task_name(model): #class{detectionmodel} 只取了模型部分
         "Explicitly define task_name for your model, i.e. 'task_name=detect', 'segment', 'classify','pose' or 'obb'."
     )
     return "detect"  # assume detect
+
+
+
+if __name__ == "__main__":
+    # model_str = "ultralytics/cfg_yaml/model_yaml/test_model_yaml/ShuffleNetV3.yaml"
+    # model_str = "ultralytics/cfg_yaml/model_yaml/v8/yolov8.yaml"
+    # model_str = "ultralytics/cfg_yaml/model_yaml/v5/yolov5.yaml"
+    model_str = "ultralytics/cfg_yaml/test_model_yaml/ShuffleNet_24_04_04.3_lightcodattention.yaml"
+    # model_str = "ultralytics/cfg_yaml/test_model_yaml/ShuffleNetV4-nofocus.yaml"
+    
+    # model_str = "runs/detect/v8_fore_detect/fore_detetct.yaml"
+    # model_str = "ultralytics/cfg_yaml/model_yaml/test_model_yaml/PConv3.yaml"
+    ch =1
+    model_dict = creat_model_dict_add(model_str)
+    # from ultralytics.nn.tasks import Detection_Model
+    detection_model = Detection_Model(model_dict, ch=1, nc=10, verbose=True)
+    x=torch.zeros(1, ch, 64, 64)
+    detection_model._predict_once(x)
+
+
+    # [10, [64, 128, 256]]   [10, [192, 256, 392]] 
+
+    # Model summary: 225 layers, 2539566 parameters, 2539550 gradients
+    # Model summary: 191 layers, 2549573 parameters, 2549557 gradients
+
+#      22        [15, 18, 21]  1    753262  ultralytics.nn.common.head.Detect            [10, [64, 128, 256]]          
+# Model summary: 225 layers, 2539566 parameters, 2539550 gradients, 7.0 GFLOPs
+# Model summary: 199 layers, 1384020 parameters, 1384004 gradients

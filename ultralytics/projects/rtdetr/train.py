@@ -26,11 +26,11 @@ class RTDETRTrainer(Detection_Trainer):
 
         args = dict(model='rtdetr-l.yaml', data='coco8.yaml', imgsz=640, epochs=3)
         trainer = RTDETRTrainer(overrides=args)
-        trainer.prepare_train()
+        trainer.DDP_or_normally_train()
         ```
     """
 
-    def get_model(self, model_str=None, model=None, verbose=True):
+    def build_model(self, model_str=None, model=None, verbose=True):
         model_dict = creat_model_dict_add(model_str)
         RTDETR_detection_model = RTDETRDetectionModel(model_dict, ch=self.data_dict["ch"], nc=self.data_dict["nc"], verbose=verbose and RANK == -1)
         if model:
@@ -69,7 +69,7 @@ class RTDETRTrainer(Detection_Trainer):
             (RTDETRValidator): Validator object for model validation.
         """
         self.loss_names = "giou_loss", "cls_loss", "l1_loss"
-        return RTDETRValidator(self.test_loader, save_dir=self.save_dir, args=copy(self.args))
+        return RTDETRValidator(self.test_dataloader, save_dir=self.save_dir, args=copy(self.args))
 
     def normalized_batch_images(self, batch):
         """

@@ -17,7 +17,7 @@ class OBBTrainer(yolo.detect.Detection_Trainer):
 
         args = dict(model='yolov8n-obb.pt', data='dota8.yaml', epochs=3)
         trainer = OBBTrainer(overrides=args)
-        trainer.prepare_train()
+        trainer.DDP_or_normally_train()
         ```
     """
 
@@ -28,7 +28,7 @@ class OBBTrainer(yolo.detect.Detection_Trainer):
         overrides["task_name"] = "obb"
         super().__init__(cfg, overrides, _callbacks)
 
-    def get_model(self, model_str=None, model=None, verbose=True):
+    def build_model(self, model_str=None, model=None, verbose=True):
         """Return OBBModel initialized with specified config and weights."""
         model_dict = creat_model_dict_add(model_str)
         model = OBBModel(model_dict, ch=self.data_dict["ch"], nc=self.data_dict["nc"], verbose=verbose and RANK == -1)
@@ -40,4 +40,4 @@ class OBBTrainer(yolo.detect.Detection_Trainer):
     def get_validator(self):
         """Return an instance of OBBValidator for validation of YOLO model."""
         self.loss_names = "box_loss", "cls_loss", "dfl_loss"
-        return yolo.obb.OBBValidator(self.test_loader, save_dir=self.save_dir, args=copy(self.args))
+        return yolo.obb.OBBValidator(self.test_dataloader, save_dir=self.save_dir, args=copy(self.args))

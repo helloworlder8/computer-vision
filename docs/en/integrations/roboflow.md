@@ -58,7 +58,7 @@ If you want to gather images yourself, try [Collect](https://github.com/roboflow
 To label data for a YOLOv8 object detection, instance segmentation, or classification model, first create a project in Roboflow.
 
 <p align="center">
-<img src="https://media.roboflow.com/ultralytics/rf_create_project.png" alt="Create a Roboflow project" width="400">
+<img src="https://media.roboflow.com/ultralytics/rf_createProject.png" alt="Create a Roboflow project" width="400">
 </p>
 
 Next, upload your images, and any pre-existing annotations you have from other tools ([using one of the 40+ supported import formats](https://roboflow.com/formats?ref=ultralytics)), into Roboflow.
@@ -185,7 +185,7 @@ When you run the code above, you will be asked to authenticate. Then, your model
 To test your model and find deployment instructions for supported SDKs, go to the "Deploy" tab in the Roboflow sidebar. At the top of this page, a widget will appear with which you can test your model. You can use your webcam for live testing or upload images or videos.
 
 <p align="center">
-<img src="https://media.roboflow.com/ultralytics/rf_test_project.png" alt="Running inference on an example image" width="800">
+<img src="https://media.roboflow.com/ultralytics/rf_testProject.png" alt="Running inference on an example image" width="800">
 </p>
 
 You can also use your uploaded model as a [labeling assistant](https://docs.roboflow.com/annotate/use-roboflow-annotate/model-assisted-labeling). This feature uses your trained model to recommend annotations on images uploaded to Roboflow.

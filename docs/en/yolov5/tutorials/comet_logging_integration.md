@@ -34,7 +34,7 @@ You can either set your credentials through environment variables
 
 ```shell
 export COMET_API_KEY=<Your Comet API Key>
-export COMET_PROJECT_NAME=<Your Comet Project Name> # This will default to 'yolov5'
+export COMETProject_NAME=<Your Comet Project Name> # This will default to 'yolov5'
 ```
 
 Or create a `.comet.config` file in your working directory and set your credentials there.

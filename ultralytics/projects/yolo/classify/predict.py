@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 
 from ultralytics.engine.engine_predictor import Engine_Predictor
-from ultralytics.engine.results import Results
+from ultralytics.utils.results import Results
 from ultralytics.utils import DEFAULT_PARAM, ops
 
 

@@ -21,7 +21,7 @@ Both the Ultralytics YOLO command-line and Python interfaces are simply a high-l
 
 Engine_Trainer contains the generic boilerplate training routine. It can be customized for any task_name based over overriding the required functions or operations as long the as correct formats are followed. For example, you can support your own custom model and dataloader by just overriding these functions:
 
-- `get_model(cfg, weights)` - The function that builds the model to be trained
+- `build_model(cfg, weights)` - The function that builds the model to be trained
 - `get_dataloader()` - The function that builds the dataloader More details and source code can be found in [`Engine_Trainer` Reference](../reference/engine/trainer.md)
 
 ## Detection_Trainer
@@ -32,25 +32,25 @@ Here's how you can use the YOLOv8 `Detection_Trainer` and customize it.
 from ultralytics.models.yolo.detect import Detection_Trainer
 
 trainer = Detection_Trainer(overrides={...})
-trainer.prepare_train()
+trainer.DDP_or_normally_train()
 trained_model = trainer.best  # get best model
 ```
 
 ### Customizing the Detection_Trainer
 
-Let's customize the trainer **to train a custom detection model** that is not supported directly. You can do this by simply overloading the existing the `get_model` functionality:
+Let's customize the trainer **to train a custom detection model** that is not supported directly. You can do this by simply overloading the existing the `build_model` functionality:
 
 ```python
 from ultralytics.models.yolo.detect import Detection_Trainer
 
 
 class CustomTrainer(Detection_Trainer):
-    def get_model(self, cfg, weights):
+    def build_model(self, cfg, weights):
         ...
 
 
 trainer = CustomTrainer(overrides={...})
-trainer.prepare_train()
+trainer.DDP_or_normally_train()
 ```
 
 You now realize that you need to customize the trainer further to:
@@ -64,12 +64,12 @@ from ultralytics.nn.tasks import Detection_Model
 
 
 class MyCustomModel(Detection_Model):
-    def init_criterion(self):
+    def build_loss_class(self):
         ...
 
 
 class CustomTrainer(Detection_Trainer):
-    def get_model(self, cfg, weights):
+    def build_model(self, cfg, weights):
         return MyCustomModel(...)
 
 
@@ -81,7 +81,7 @@ def log_model(trainer):
 
 trainer = CustomTrainer(overrides={...})
 trainer.add_callback("on_train_epoch_end", log_model)  # Adds to existing callback
-trainer.prepare_train()
+trainer.DDP_or_normally_train()
 ```
 
 To know more about Callback triggering events and entry point, checkout our [Callbacks Guide](callbacks.md)
